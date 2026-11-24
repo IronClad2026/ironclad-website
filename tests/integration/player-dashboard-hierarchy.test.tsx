@@ -10,6 +10,22 @@ const loadPlayerNotificationsMock = vi.hoisted(() => vi.fn());
 const loadCommunityPollsForRequestMock = vi.hoisted(() => vi.fn());
 const loadPlayerTournamentDivisionInvitationsMock = vi.hoisted(() => vi.fn());
 const loadPlayerBadgeRevealDashboardStateMock = vi.hoisted(() => vi.fn());
+const loadDashboardOverviewEventsMock = vi.hoisted(() => vi.fn());
+const useSearchParamsMock = vi.hoisted(() => vi.fn());
+
+vi.mock("next/navigation", () => ({
+  useSearchParams: useSearchParamsMock,
+  redirect: () => { throw new Error("NEXT_REDIRECT"); },
+}));
+vi.mock("@/components/dashboard/overview-event-data", () => ({
+  loadDashboardOverviewEvents: loadDashboardOverviewEventsMock,
+}));
+vi.mock("@/lib/wardrobe/environment", () => ({
+  isReadyWardrobePilotEnabled: () => true,
+}));
+vi.mock("@/components/dashboard/DashboardReadyWardrobe", () => ({
+  default: ({ mode }: { mode: string }) => <section data-dashboard-section="wardrobe" data-wardrobe-mode={mode} />,
+}));
 
 vi.mock("@clerk/nextjs/server", () => ({ auth: authMock }));
 vi.mock("@/app/dashboard/badge-reveal-actions", () => ({
@@ -77,6 +93,14 @@ import { getCompetitionPriority } from "@/components/dashboard/competition-prese
 describe("Player Dashboard information hierarchy", () => {
   afterEach(cleanup);
   beforeEach(() => {
+    window.history.replaceState(null, "", "/dashboard");
+    useSearchParamsMock.mockReturnValue(new URLSearchParams());
+    loadDashboardOverviewEventsMock.mockResolvedValue({ events: [{
+      id: "event", slug: "command-centre-cup", title: "Command Centre Cup", bannerImageUrl: null,
+      status: "registration_open", registrationEnabled: true, registrationOpenAt: null,
+      registrationCloseAt: "2099-01-01T00:00:00Z", startDate: null,
+      brackets: [{ id: "33333333-3333-4333-8333-333333333333", launchedAt: null, notHeld: false }],
+    }], error: false });
     authMock.mockResolvedValue({ userId: "user_dashboard_hierarchy" });
     createAuthenticatedSupabaseClientMock.mockResolvedValue(
       createDashboardClient()
@@ -115,25 +139,23 @@ describe("Player Dashboard information hierarchy", () => {
     });
   });
 
-  it("keeps current competition ahead of statistics, history, utilities, and community", async () => {
+  it("keeps the next event above wardrobe and current competition on Overview", async () => {
     render(await PlayerDashboardPage());
 
     const commandCentre = document.querySelector(
       "main[data-dashboard-command-centre]"
     );
     expect(commandCentre).not.toBeNull();
-    expect(commandCentre).toHaveClass("px-3", "pt-24", "sm:px-6");
+    expect(commandCentre).toHaveClass("px-3", "pt-20", "sm:px-6");
+    expect(document.querySelector("[data-dashboard-view]")).toHaveAttribute("data-dashboard-view", "overview");
 
     const orderedSections = [
       "header",
       "identity",
+      "wardrobe",
       "current-actions",
       "registrations",
       "division-invitations",
-      "statistics",
-      "history",
-      "community",
-      "profile-visibility",
     ].map((name) =>
       commandCentre?.querySelector(`[data-dashboard-section="${name}"]`)
     );
@@ -153,24 +175,24 @@ describe("Player Dashboard information hierarchy", () => {
     }
 
     const identity = commandCentre?.querySelector('[data-dashboard-section="identity"]');
-    expect(screen.getByRole("heading", { name: "Player Dashboard" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Command Centre Player" })).toBeVisible();
     expect(identity).toHaveTextContent("Command Centre Player");
     expect(identity).toHaveTextContent("1,420");
-    expect(identity).toHaveTextContent("Profile Complete");
     expect(identity).toHaveTextContent("Australia/Sydney");
     expect(screen.getByRole("heading", { name: "Your Competition" })).toBeVisible();
-    expect(screen.getByRole("heading", { name: "Career History" })).toBeVisible();
-    expect(screen.getByRole("heading", { name: "Profile & Visibility" })).toBeVisible();
-    expect(screen.getAllByRole("tab")).toHaveLength(2);
-    expect(screen.getByRole("tab", { name: /^Tournaments\s*0$/ })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("tab", { name: /^Championships\s*0$/ })).toHaveAttribute("aria-selected", "false");
+    const spotlight = document.querySelector("[data-dashboard-event]");
+    const wardrobe = document.querySelector('[data-dashboard-section="wardrobe"]');
+    expect(spotlight).toBeVisible();
+    expect((spotlight!.compareDocumentPosition(wardrobe!) & Node.DOCUMENT_POSITION_FOLLOWING)).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Overview" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "Ready Wardrobe" })).toHaveAttribute("href", "/dashboard?wardrobe=open#ready-wardrobe");
+    expect(screen.getByRole("link", { name: "Player hub" })).toHaveAttribute("href", "/dashboard?section=player-hub");
+    expect(screen.queryByRole("heading", { name: "Player hub" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Career History" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab")).not.toBeInTheDocument();
     expect(commandCentre?.querySelector('[data-dashboard-section="registration-archive"]')).toBeNull();
     expect(screen.queryByRole("button", { name: /Registration Archive/, hidden: true })).not.toBeInTheDocument();
     expect(document.querySelector('[data-registration-presentation="historical"]')).toBeNull();
-    fireEvent.click(screen.getByRole("tab", { name: /^Championships\s*0$/ }));
-    expect(screen.getByRole("tab", { name: /^Championships\s*0$/ })).toHaveAttribute("aria-selected", "true");
-    fireEvent.click(screen.getByRole("tab", { name: /^Tournaments\s*0$/ }));
-    expect(screen.getByRole("tab", { name: /^Tournaments\s*0$/ })).toHaveAttribute("aria-selected", "true");
     const matchActions = commandCentre?.querySelector('[data-dashboard-surface="match-actions"]');
     const updates = commandCentre?.querySelector('[data-dashboard-surface="notifications"]');
     expect((matchActions?.compareDocumentPosition(updates!) ?? 0) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -181,24 +203,38 @@ describe("Player Dashboard information hierarchy", () => {
     ).toHaveLength(1);
     expect(document.querySelector('[data-profile-visibility-control="public-profile"]')).toBeNull();
     expect(document.querySelector('[data-profile-visibility-control="discord"]')).not.toBeNull();
-    expect(
-      screen.getByRole("link", { name: "View/Edit Profile" })
-    ).toHaveAttribute("href", "/profile");
+    expect(screen.queryByRole("link", { name: "View/Edit Profile" })).not.toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: "Go to Tournaments" })
     ).toHaveAttribute("href", "/tournaments");
-    expect(
-      document.querySelector("[data-dashboard-surface='registration-actions']")
-    ).not.toBeNull();
-    expect(
-      document.querySelector("[data-dashboard-surface='badges']")
-    ).not.toBeNull();
-    expect(
-      document.querySelector("[data-dashboard-surface='community-polls']")
-    ).not.toBeNull();
+    expect(document.querySelector("[data-dashboard-surface='badges']")).not.toBeVisible();
+    expect(document.querySelector("[data-dashboard-surface='community-polls']")).not.toBeVisible();
   });
 
-  it("renders only the current bucket while retaining every historical row in the read result", async () => {
+  it("keeps Player hub details reachable by its real URL without showing them on Overview", async () => {
+    window.history.replaceState(null, "", "/dashboard?section=player-hub");
+    useSearchParamsMock.mockReturnValue(new URLSearchParams("section=player-hub"));
+    render(await PlayerDashboardPage());
+    expect(document.querySelector("[data-dashboard-view]")).toHaveAttribute("data-dashboard-view", "hub");
+    expect(screen.getByRole("heading", { name: "Player hub" })).toBeVisible();
+    expect(screen.getByRole("link", { name: "Player hub" })).toHaveAttribute("aria-current", "page");
+    expect(document.querySelector('[data-dashboard-section="statistics"]')).toBeVisible();
+    expect(document.querySelector('[data-dashboard-section="current-actions"]')).not.toBeVisible();
+    openDisclosure("Career History");
+    expect(screen.getAllByRole("tab")).toHaveLength(2);
+    expect(screen.getByRole("tab", { name: /^Tournaments\s*0$/ })).toHaveAttribute("aria-selected", "true");
+    fireEvent.click(screen.getByRole("tab", { name: /^Championships\s*0$/ }));
+    expect(screen.getByRole("tab", { name: /^Championships\s*0$/ })).toHaveAttribute("aria-selected", "true");
+    openDisclosure("Badge collection");
+    openDisclosure("Community polls");
+    openDisclosure("Profile visibility");
+    expect(document.querySelector("[data-dashboard-surface='badges']")).toBeVisible();
+    expect(document.querySelector("[data-dashboard-surface='community-polls']")).toBeVisible();
+    expect(document.querySelector('[data-profile-visibility-control="discord"]')).toBeVisible();
+    expect(screen.getByRole("link", { name: /View\/Edit Profile/ })).toHaveAttribute("href", "/profile");
+  });
+
+  it("keeps historical registrations in read-only details without reusing legacy action anchors", async () => {
     const historical = [
       { id: "completed-record", tournament_title: "Completed historical event", tournaments: { status: "completed" }, tournament_brackets: { launched_at: "2026-08-06T00:00:00.000Z" } },
       { id: "cancelled-record", tournament_title: "Cancelled historical event", tournaments: { status: "cancelled" }, registration_status: "waitlisted", waitlist_offer_status: "offered" },
@@ -212,12 +248,21 @@ describe("Player Dashboard information hierarchy", () => {
 
     render(await PlayerDashboardPage());
 
-    expect(screen.getByRole("heading", { name: "Command Centre Cup" })).toBeVisible();
+    const registrations = document.querySelector<HTMLDetailsElement>('details[data-dashboard-section="registrations"]');
+    expect(registrations).not.toBeNull();
+    if (!registrations!.open) fireEvent.click(registrations!.querySelector("summary")!);
+    expect(screen.getByRole("heading", { name: "Command Centre Cup", level: 3 })).toBeVisible();
     expect(document.querySelectorAll('[data-registration-presentation="current"]')).toHaveLength(1);
     expect(document.querySelector('[data-dashboard-surface="registration-actions"]')).toBeVisible();
+    expect(document.querySelectorAll('[data-registration-presentation="historical"]')).toHaveLength(historical.length);
+    openDisclosure("Past registrations");
     for (const record of historical) {
-      expect(screen.queryByText(record.tournament_title)).not.toBeInTheDocument();
+      expect(screen.getByText(record.tournament_title)).toBeVisible();
       expect(document.getElementById(`registration-${record.id}`)).toBeNull();
+    }
+    for (const article of document.querySelectorAll('[data-registration-presentation="historical"]')) {
+      expect(article.querySelector('[data-dashboard-surface="registration-actions"]')).toBeNull();
+      expect(article).toHaveTextContent("Submitted ELO");
     }
     expect(document.querySelector('[data-dashboard-section="registration-archive"]')).toBeNull();
     expect(screen.queryByText(/View archive|Hide archive|Registration Archive/)).not.toBeInTheDocument();
@@ -230,6 +275,7 @@ describe("Player Dashboard information hierarchy", () => {
     await expect(PlayerDashboardPage()).rejects.toThrow("NEXT_REDIRECT");
     expect(createAuthenticatedSupabaseClientMock).not.toHaveBeenCalled();
     expect(loadPlayerCareerDashboardMock).not.toHaveBeenCalled();
+    expect(loadDashboardOverviewEventsMock).not.toHaveBeenCalled();
   });
 
   it("prioritizes the nearest available response and leaves the regular order when no response is due", () => {
@@ -252,6 +298,13 @@ describe("Player Dashboard information hierarchy", () => {
     expect(getCompetitionPriority([], [expired], [{ status: "declined" }], now)).toBeNull();
   });
 });
+
+function openDisclosure(title: string) {
+  const summary = Array.from(document.querySelectorAll("details > summary"))
+    .find(element => element.querySelector("strong")?.textContent === title);
+  if (!summary) throw new Error(`Expected ${title} disclosure`);
+  fireEvent.click(summary);
+}
 
 function createDashboardClient(historicalOverrides: Record<string, unknown>[] = []) {
   const profileQuery = chainQuery();

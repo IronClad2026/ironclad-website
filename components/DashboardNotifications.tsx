@@ -45,6 +45,7 @@ import { localizeBracketRoundName } from "@/lib/i18n/round-display";
 import type { MessageValues } from "@/lib/i18n/types";
 import type { DashboardNotification } from "@/lib/player-dashboard";
 import { compareMatchAttention, requiresMatchAttention } from "@/components/dashboard/competition-presentation";
+import { DASHBOARD_RESULT_REVIEW_EVENT, isDashboardResultReviewable } from "@/components/dashboard/overview-event-presentation";
 
 type NotificationTranslator = (
   path: string,
@@ -58,7 +59,7 @@ export default function DashboardNotifications({
 }: {
   notifications: DashboardNotification[];
   error?: string | null;
-  presentation?: "default" | "competition";
+  presentation?: "default" | "competition" | "dashboard-overview";
 }) {
   const [notifications, setNotifications] = useState(initialNotifications);
   const [expanded, setExpanded] = useState(() =>
@@ -82,11 +83,27 @@ export default function DashboardNotifications({
     ),
   });
   const actionRequired = notifications.filter(requiresMatchAttention).length;
-  const displayedNotifications = presentation === "competition"
+  const compactPresentation = presentation !== "default";
+  const displayedNotifications = compactPresentation
     ? [...notifications].sort((left, right) => compareMatchAttention(left, right, now ?? 0))
     : notifications;
   const allSelected =
     notifications.length > 0 && selectedIds.size === notifications.length;
+
+  useEffect(() => {
+    const openResult = (event: Event) => {
+      const detail: unknown = (event as CustomEvent<unknown>).detail;
+      if (pending || !detail || typeof detail !== "object" || !("notificationId" in detail) ||
+        typeof detail.notificationId !== "string") return;
+      const notification = notifications.find(row => row.id === detail.notificationId);
+      if (!notification || !isDashboardResultReviewable(notification)) return;
+      setMessage("");
+      setExpanded(true);
+      setSelected(notification);
+    };
+    window.addEventListener(DASHBOARD_RESULT_REVIEW_EVENT, openResult);
+    return () => window.removeEventListener(DASHBOARD_RESULT_REVIEW_EVENT, openResult);
+  }, [notifications, pending]);
 
   if (error) {
     return (
@@ -201,7 +218,7 @@ export default function DashboardNotifications({
         onClick={() => setExpanded((current) => !current)}
         aria-expanded={expanded}
         aria-controls={contentId}
-        className={`flex min-h-14 w-full items-center justify-between gap-3 border p-4 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300 ${presentation === "competition" ? actionRequired > 0 ? "border-orange-400/35 bg-orange-500/[0.06] hover:border-orange-300/60" : "border-white/10 bg-zinc-950/60 hover:border-white/25" : "border-amber-700/35 bg-black/60 hover:border-amber-500/55"}`}
+        className={`flex min-h-14 w-full items-center justify-between gap-3 border p-4 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300 ${compactPresentation ? actionRequired > 0 ? "border-orange-400/35 bg-orange-500/[0.06] hover:border-orange-300/60" : "border-white/10 bg-zinc-950/60 hover:border-white/25" : "border-amber-700/35 bg-black/60 hover:border-amber-500/55"}`}
       >
         <span className="flex min-w-0 items-center gap-4">
           <span className={`grid h-10 w-10 shrink-0 place-items-center ${actionRequired > 0 ? "text-orange-300" : "text-zinc-400"}`}>
@@ -211,7 +228,7 @@ export default function DashboardNotifications({
             <span className="block text-sm font-black uppercase tracking-[0.18em] text-white">
               {t("dashboard.title")}
             </span>
-            <span className={presentation === "competition" ? "sr-only" : "mt-1 block max-w-2xl text-xs leading-5 text-zinc-400"}>
+            <span className={compactPresentation ? "sr-only" : "mt-1 block max-w-2xl text-xs leading-5 text-zinc-400"}>
               {t("dashboard.description")}
             </span>
             <span className="mt-1.5 flex flex-wrap items-center gap-2 text-xs font-semibold">
@@ -318,7 +335,7 @@ export default function DashboardNotifications({
                   </div>
                 </div>
 
-                <div className={`max-h-80 overflow-y-auto p-2 ${presentation === "competition" ? "order-first" : ""}`}>
+                <div className={`max-h-80 overflow-y-auto p-2 ${compactPresentation ? "order-first" : ""}`}>
                   {displayedNotifications.map((notification) => (
                     <NotificationRow
                       key={notification.id}

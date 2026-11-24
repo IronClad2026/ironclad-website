@@ -56,6 +56,9 @@ vi.mock("@/lib/player-dashboard", () => ({
 vi.mock("@/lib/player-polls", () => ({
   loadCommunityPollsForRequest: loadCommunityPollsForRequestMock,
 }));
+vi.mock("@/components/dashboard/overview-event-data", () => ({
+  loadDashboardOverviewEvents: vi.fn(async () => ({ events: [], error: false })),
+}));
 
 vi.mock("@/lib/player-showcase/read", () => ({
   getPlayerShowcaseEnabled: vi.fn(async () => false),
@@ -133,7 +136,7 @@ describe("dashboard registration-note privacy", () => {
       } else {
         expect(screen.queryByText(title)).not.toBeInTheDocument();
         expect(screen.queryByText(message)).not.toBeInTheDocument();
-        expect(screen.queryByText("Privacy Test Tournament")).not.toBeInTheDocument();
+        expect(screen.getByText("Privacy Test Tournament").closest("article")).toHaveAttribute("data-registration-presentation", "historical");
       }
       expect(screen.queryByText(PRIVATE_ADMIN_NOTE)).not.toBeInTheDocument();
       expect(document.body.textContent).not.toContain(PRIVATE_ADMIN_NOTE);
@@ -142,7 +145,7 @@ describe("dashboard registration-note privacy", () => {
   );
 
   it.each(["cancelled", "voided"] as const)(
-    "does not render a %s tournament registration or its private history",
+    "keeps a %s tournament registration read-only and its private history out of the response",
     async (tournamentStatus) => {
       const client = createDashboardClient("waitlisted", {
         waitlist_offer_status: "offered",
@@ -160,8 +163,12 @@ describe("dashboard registration-note privacy", () => {
         "tournaments!inner(status)"
       );
       expect(screen.queryByText("Read-only historical record")).not.toBeInTheDocument();
-      expect(screen.queryByText("Privacy Test Tournament")).not.toBeInTheDocument();
-      expect(document.querySelector("[data-registration-presentation=historical]")).toBeNull();
+      const history = screen.getByText("Privacy Test Tournament").closest("article");
+      expect(history).toHaveAttribute("data-registration-presentation", "historical");
+      expect(history).not.toHaveAttribute("id");
+      expect(history?.querySelector("button")).toBeNull();
+      expect(document.body.textContent).not.toContain(PRIVATE_ADMIN_NOTE);
+      expect(String(registrationColumns)).not.toContain("admin_notes");
       expect(
         screen.queryByRole("button", { name: "Accept Spot" })
       ).not.toBeInTheDocument();

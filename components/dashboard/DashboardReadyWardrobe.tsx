@@ -1,93 +1,59 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { READY_DOCK_POSTER_DATA } from "@/lib/ready/poster-data";
-import { readyWardrobeOpenEvent } from "@/lib/wardrobe/catalogue";
-
-const wardrobeId = "ready-wardrobe";
-const wardrobeHash = `#${wardrobeId}`;
-const panelId = `${wardrobeId}-panel`;
-const headingId = `${wardrobeId}-heading`;
+import type { DashboardWardrobeMode } from "@/components/ready/WardrobePilot";
 
 const WardrobePilot = dynamic(() => import("@/components/ready/WardrobePilot"), {
   ssr: false,
-  loading: () => <p className="py-3 text-sm text-zinc-300" role="status">Loading Ready’s wardrobe…</p>,
+  loading: () => (
+    <div className="flex min-h-20 items-center gap-3 rounded-lg border border-white/15 bg-[#1a1d1f] px-2.5 py-1.5" role="status">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img alt="" src={READY_DOCK_POSTER_DATA} width={64} height={64} className="size-16 shrink-0 object-contain" />
+      <span className="text-sm text-zinc-300">Loading Ready’s wardrobe…</span>
+    </div>
+  ),
 });
 
-function writeWardrobeLocation(open: boolean) {
-  const url = new URL(window.location.href);
-  if (open) {
-    url.searchParams.set("wardrobe", "open");
-    url.hash = wardrobeHash;
-  } else {
-    url.searchParams.delete("wardrobe");
-    if (url.hash === wardrobeHash) url.hash = "";
-  }
-  if (url.href !== window.location.href) window.history.replaceState(null, "", url);
-}
-
-export default function DashboardReadyWardrobe() {
-  const open = useSearchParams()?.get("wardrobe") === "open";
+export default function DashboardReadyWardrobe({ mode, onOpen, onClose, active = true }: {
+  mode: DashboardWardrobeMode;
+  onOpen: () => void;
+  onClose: () => void;
+  active?: boolean;
+}) {
+  const open = mode === "wardrobe";
   const section = useRef<HTMLElement>(null);
-  const focusSection = useCallback(() => {
-    section.current?.focus({ preventScroll: true });
-    section.current?.scrollIntoView({ block: "start" });
-  }, []);
+  const [started, setStarted] = useState(active);
+  if (active && !started) setStarted(true);
 
   useEffect(() => {
     if (!open) return;
-    const frame = window.requestAnimationFrame(focusSection);
+    const frame = window.requestAnimationFrame(() => section.current?.focus({ preventScroll: true }));
     return () => window.cancelAnimationFrame(frame);
-  }, [open, focusSection]);
-
-  useEffect(() => {
-    function openFromInvitation() {
-      writeWardrobeLocation(true);
-      if (open) focusSection();
-    }
-    function focusFromHash() {
-      if (open && window.location.hash === wardrobeHash) focusSection();
-    }
-    window.addEventListener(readyWardrobeOpenEvent, openFromInvitation);
-    window.addEventListener("hashchange", focusFromHash);
-    return () => {
-      window.removeEventListener(readyWardrobeOpenEvent, openFromInvitation);
-      window.removeEventListener("hashchange", focusFromHash);
-    };
-  }, [open, focusSection]);
+  }, [open]);
 
   return (
     <section
       ref={section}
-      id={wardrobeId}
+      id="ready-wardrobe"
       tabIndex={-1}
-      aria-labelledby={headingId}
+      aria-labelledby={open ? "ready-wardrobe-heading" : undefined}
+      aria-label={open ? undefined : "Ready Wardrobe"}
       data-wardrobe-expanded={open ? "true" : undefined}
-      className="col-span-full my-1 min-w-0 scroll-mt-28 rounded-lg border border-white/15 bg-zinc-950/85 px-2.5 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300 sm:scroll-mt-32"
+      className="min-w-0 scroll-mt-28 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300 sm:scroll-mt-32"
     >
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <div className="mr-auto flex min-w-0 items-center gap-2">
-          {!open ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img alt="" src={READY_DOCK_POSTER_DATA} width={44} height={44} className="size-11 shrink-0 object-contain" />
-          ) : null}
-          <h3 id={headingId} className="break-words text-sm font-bold text-zinc-100">Ready Wardrobe</h3>
+      {open && (
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+          <h2 id="ready-wardrobe-heading" className="text-2xl font-semibold tracking-tight text-[#f5f2ed] sm:text-3xl">Ready Wardrobe</h2>
+          <button type="button" onClick={onClose}
+            className="min-h-11 rounded-md border border-white/15 bg-white/5 px-3 py-2 text-sm font-semibold text-zinc-100 hover:border-orange-400 focus-visible:outline-2 focus-visible:outline-orange-400">
+            <span className="sm:hidden" aria-hidden="true">Close</span>
+            <span className="sr-only sm:not-sr-only">Close wardrobe</span>
+          </button>
         </div>
-        <button
-          type="button"
-          aria-controls={panelId}
-          aria-expanded={open}
-          onClick={() => writeWardrobeLocation(!open)}
-          className="min-h-11 max-w-full rounded-md border border-orange-300/50 px-3 py-2 text-left text-sm font-semibold text-orange-200 transition hover:border-orange-300 hover:bg-orange-500/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300"
-        >
-          {open ? "Close wardrobe" : "Open wardrobe"}
-        </button>
-      </div>
-      <div id={panelId} hidden={!open}>
-        {open ? <WardrobePilot embedded /> : null}
-      </div>
+      )}
+      {started && <WardrobePilot embedded dashboard={{ mode, onBrowseItems: onOpen, active }} />}
     </section>
   );
 }

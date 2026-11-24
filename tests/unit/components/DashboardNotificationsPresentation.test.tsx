@@ -11,6 +11,8 @@ import {
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import DashboardNotifications from "@/components/DashboardNotifications";
+import DashboardOverviewEvent from "@/components/dashboard/DashboardOverviewEvent";
+import { buildDashboardOverviewEvent, DASHBOARD_RESULT_REVIEW_EVENT } from "@/components/dashboard/overview-event-presentation";
 import type { NotificationActionResult } from "@/app/dashboard/actions";
 import type { DashboardNotification } from "@/lib/player-dashboard";
 
@@ -71,6 +73,40 @@ describe("match actions card presentation", () => {
     expect(screen.getByRole("button", { name: /Match Actions/i })).toHaveAttribute("aria-expanded", "false");
     expect(screen.getByText("No actions required")).toBeVisible();
     expect(screen.queryByText("Action required")).toBeNull();
+  });
+
+  it("opens the existing result workflow from the Overview spotlight and restores focus", async () => {
+    const notification = actionNotification({ confirmationDeadlineAt: "2099-08-21T01:00:00.000Z" });
+    const model = buildDashboardOverviewEvent({ notifications: [notification], registrations: [], events: [], profileCompleted: true });
+    render(<>
+      <DashboardOverviewEvent event={model} locale="en" />
+      <DashboardNotifications presentation="dashboard-overview" notifications={[notification]} />
+    </>);
+    expect(screen.getByRole("button", { name: /Match Actions/i })).toHaveAttribute("aria-expanded", "false");
+    const opener = screen.getByRole("button", { name: "Review result" });
+    opener.focus();
+    fireEvent.click(opener);
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toBeVisible();
+    expect(await within(dialog).findByRole("button", { name: "Confirm result" })).toBeEnabled();
+    expect(confirmDashboardMatchResultMock).not.toHaveBeenCalled();
+    expect(disputeDashboardMatchResultMock).not.toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByRole("button", { name: /close/i }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await waitFor(() => expect(opener).toHaveFocus());
+  });
+
+  it("ignores unknown, expired and unauthorized spotlight review requests", () => {
+    const expired = actionNotification({ confirmationDeadlineAt: "2020-08-21T01:00:00.000Z" });
+    const unauthorized = actionNotification({ id: "unauthorized", canConfirm: false, canDispute: false, confirmationDeadlineAt: "2099-08-21T01:00:00.000Z" });
+    render(<DashboardNotifications presentation="dashboard-overview" notifications={[expired, unauthorized]} />);
+    for (const notificationId of ["missing", expired.id, unauthorized.id]) {
+      fireEvent(window, new CustomEvent(DASHBOARD_RESULT_REVIEW_EVENT, { detail: { notificationId } }));
+    }
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Match Actions/i })).toHaveAttribute("aria-expanded", "false");
+    expect(confirmDashboardMatchResultMock).not.toHaveBeenCalled();
+    expect(disputeDashboardMatchResultMock).not.toHaveBeenCalled();
   });
 
   it("shows the action-required indicator for a response workflow", () => {

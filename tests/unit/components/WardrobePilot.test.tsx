@@ -8,6 +8,7 @@ import type { WardrobeState } from "@/lib/wardrobe/catalogue";
 const mocks = vi.hoisted(() => ({
   prepare: vi.fn(),
   commit: vi.fn(),
+  setVisible: vi.fn(),
 }));
 const initial = { access: "admin", sessionId: "test-session", itemIds: [] } as const;
 
@@ -17,7 +18,7 @@ vi.mock("@clerk/nextjs", () => ({
 vi.mock("@/components/ready/renderer", () => ({
   loadMascotRenderer: async () => ({ onStatus }: { onStatus: (status: string) => void }) => {
     onStatus("ready");
-    return { setMode: vi.fn(), dispose: vi.fn(), prepareWardrobe: mocks.prepare };
+    return { setMode: vi.fn(), setVisible: mocks.setVisible, dispose: vi.fn(), prepareWardrobe: mocks.prepare };
   },
 }));
 
@@ -143,7 +144,7 @@ it("starts the dashboard preview without item rows and preserves the catalogue a
 
   fireEvent.click(browse);
   expect(browse).toHaveAccessibleName("Hide items");
-  expect(browse.closest("section")?.nextElementSibling).toBe(panel);
+  expect(browse.closest("section")?.nextElementSibling).toContainElement(panel);
   expect(browse.closest("section")).toContainElement(canvas);
   expect(panel).toBeVisible();
   fireEvent.change(screen.getByRole("combobox", { name: "Category" }), { target: { value: "Helmet accessories" } });
@@ -165,4 +166,49 @@ it("starts the dashboard preview without item rows and preserves the catalogue a
   expect(screen.getByRole("img", { name: "Ready 3D preview" })).toBe(canvas);
   expect(mocks.prepare).toHaveBeenCalledOnce();
   expect(request).toHaveBeenCalledOnce();
+});
+
+it("keeps the dashboard's saved live Ready, catalogue and filter when switching views", async () => {
+  const outfit: WardrobeState = { ...initial, itemIds: ["eyewear_smoked_aviators"] };
+  const request = vi.fn(() => Promise.resolve(Response.json(outfit)));
+  const openWardrobe = vi.fn();
+  vi.stubGlobal("fetch", request);
+  mocks.prepare.mockResolvedValue({ commit: mocks.commit, discard: vi.fn() });
+  const surface = (mode: "overview" | "wardrobe", active = true) => (
+    <WardrobePilot initial={outfit} embedded dashboard={{ mode, onBrowseItems: openWardrobe, active }} />
+  );
+  const view = render(surface("overview"));
+
+  const canvas = await screen.findByRole("img", { name: "Ready 3D preview" });
+  expect(await screen.findByText("Smoked Aviators")).toBeVisible();
+  expect(screen.queryByRole("button", { name: "Larger preview" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("region", { name: "Ready items" })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Browse items" }));
+  expect(openWardrobe).toHaveBeenCalledOnce();
+
+  view.rerender(surface("wardrobe"));
+  expect(screen.getByRole("img", { name: "Ready 3D preview" })).toBe(canvas);
+  expect(screen.getByRole("button", { name: "Catalogue" })).toHaveAttribute("aria-pressed", "true");
+  expect(screen.getByRole("button", { name: "Larger preview" })).toBeVisible();
+  fireEvent.change(screen.getByRole("combobox", { name: "Category" }), { target: { value: "Helmet accessories" } });
+  const crown = screen.getByRole("button", { name: "Equip Tanker’s Crown" });
+
+  view.rerender(surface("overview"));
+  expect(screen.queryByRole("button", { name: "Equip Tanker’s Crown" })).not.toBeInTheDocument();
+  expect(screen.getByRole("img", { name: "Ready 3D preview" })).toBe(canvas);
+  view.rerender(surface("wardrobe"));
+  expect(screen.getByRole("combobox", { name: "Category" })).toHaveValue("Helmet accessories");
+  expect(screen.getByRole("button", { name: "Equip Tanker’s Crown" })).toBe(crown);
+  expect(mocks.prepare).toHaveBeenCalledOnce();
+  expect(request).toHaveBeenCalledOnce();
+
+  view.rerender(surface("overview", false));
+  expect(mocks.setVisible).toHaveBeenLastCalledWith(false);
+  fireEvent(window, new Event("focus"));
+  expect(request).toHaveBeenCalledOnce();
+  view.rerender(surface("wardrobe"));
+  expect(mocks.setVisible).toHaveBeenLastCalledWith(true);
+  expect(screen.getByRole("img", { name: "Ready 3D preview" })).toBe(canvas);
+  await waitFor(() => expect(request).toHaveBeenCalledTimes(2));
+  expect(mocks.prepare).toHaveBeenCalledOnce();
 });

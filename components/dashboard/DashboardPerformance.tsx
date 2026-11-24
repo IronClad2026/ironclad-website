@@ -22,15 +22,15 @@ export default function DashboardPerformance({
   ];
 
   return (
-    <section id="dashboard-statistics" className="scroll-mt-28" aria-labelledby="dashboard-performance-title" data-dashboard-section="statistics">
-      <h2 id="dashboard-performance-title" className="text-xl font-bold text-white sm:text-2xl">
+    <section id="dashboard-statistics" className="scroll-mt-28 rounded-[0.625rem] border border-[#343a3d] bg-[#1b1f21] p-3.5 sm:p-4" aria-labelledby="dashboard-performance-title" data-dashboard-section="statistics">
+      <h2 id="dashboard-performance-title" className="text-base font-bold text-[#f4f0e8]">
         {t("dashboard.statistics.title")}
       </h2>
-      <dl className="mt-2 grid grid-cols-3 gap-px overflow-hidden border border-white/12 bg-white/10">
+      <dl className="mt-3 grid grid-cols-3 gap-y-3 md:grid-cols-6">
         {values.map(({ key, value }) => (
-          <div key={key} className="flex min-w-0 flex-col-reverse justify-end gap-1 bg-zinc-950 px-2.5 py-2.5 sm:px-3">
+          <div key={key} className="flex min-w-0 flex-col-reverse justify-end gap-1 border-l border-white/10 px-2 first:border-l-0 max-md:nth-[4]:border-l-0 sm:px-3">
             <dt className="break-words text-xs leading-4 text-zinc-400">{t(`dashboard.statistics.${key}`)}</dt>
-            <dd className={`text-2xl font-bold tabular-nums sm:text-3xl ${key === "winRate" || key === "tournamentsWon" ? "text-orange-300" : "text-white"}`}>{value}</dd>
+            <dd className="text-2xl font-bold tabular-nums text-[#f4f0e8] sm:text-3xl">{value}</dd>
           </div>
         ))}
       </dl>

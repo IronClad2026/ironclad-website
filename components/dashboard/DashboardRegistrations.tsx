@@ -15,17 +15,19 @@ type RegistrationProps = {
   registration: PlayerRegistration;
   locale: Locale;
   t: DashboardTranslator;
+  historical?: boolean;
 };
 
 export function RegistrationCard({
   registration,
   locale,
   t,
+  historical = false,
 }: RegistrationProps) {
   return (
     <article
-      id={`registration-${registration.id}`}
-      data-registration-presentation="current"
+      id={historical ? undefined : `registration-${registration.id}`}
+      data-registration-presentation={historical ? "historical" : "current"}
       className="min-w-0 scroll-mt-28 border border-white/12 border-t-orange-400/50 bg-zinc-950/85 transition-colors focus-within:border-white/25 target:border-orange-400/70"
     >
       <div className="px-3 pt-3 pb-2 sm:px-4">
@@ -45,10 +47,12 @@ export function RegistrationCard({
       <div className="border-y border-white/8 px-3 py-2 sm:px-4">
         <RegistrationMetadata registration={registration} locale={locale} t={t} />
       </div>
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-3 py-2.5 sm:px-4">
-        <RegistrationContext registration={registration} t={t} />
-        <RegistrationActions registration={registration} />
-      </div>
+      {!historical && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-3 py-2.5 sm:px-4">
+          <RegistrationContext registration={registration} t={t} />
+          <RegistrationActions registration={registration} />
+        </div>
+      )}
     </article>
   );
 }

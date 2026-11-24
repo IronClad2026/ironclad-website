@@ -1,7 +1,9 @@
 import { auth } from "@clerk/nextjs/server";
-import { ArrowUpRight, MapPin } from "lucide-react";
+import { ArrowUpRight, Award, ChevronDown, ChevronRight, ClipboardList, Eye, Flag, Images, ListChecks, MapPin, UserRound } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import type { ReactNode } from "react";
 import DashboardNotifications from "@/components/DashboardNotifications";
 import DashboardBadgesSection from "@/components/badges/DashboardBadgesSection";
 import DiscordContactVisibilityCard from "@/components/DiscordContactVisibilityCard";
@@ -30,9 +32,13 @@ import DashboardIdentity from "@/components/dashboard/DashboardIdentity";
 import DashboardCareerHistory from "@/components/dashboard/DashboardCareerHistory";
 import DashboardRegistrationNavigation from "@/components/dashboard/DashboardRegistrationNavigation";
 import DashboardPerformance from "@/components/dashboard/DashboardPerformance";
+import DashboardOverviewEvent from "@/components/dashboard/DashboardOverviewEvent";
+import { loadDashboardOverviewEvents } from "@/components/dashboard/overview-event-data";
+import { buildDashboardOverviewEvent } from "@/components/dashboard/overview-event-presentation";
 import { EmptyRegistrations, RegistrationCard } from "@/components/dashboard/DashboardRegistrations";
 import { groupDashboardRegistrations, type PlayerRegistration } from "@/components/dashboard/registration-presentation";
 import { getCompetitionPriority, type CompetitionSection } from "@/components/dashboard/competition-presentation";
+import DashboardSections from "./DashboardSections";
 import styles from "./Dashboard.module.css";
 
 export const dynamic = "force-dynamic";
@@ -77,6 +83,7 @@ export default async function PlayerDashboardPage() {
     playerNotifications,
     communityPolls,
     showcaseEnabled,
+    eventState,
   ] =
     await Promise.all([
       supabase
@@ -97,6 +104,7 @@ export default async function PlayerDashboardPage() {
       loadPlayerNotifications(userId, 8, locale),
       loadCommunityPollsForRequest(),
       getPlayerShowcaseEnabled(),
+      loadDashboardOverviewEvents(),
     ]);
 
   if (profileResult.error) {
@@ -118,18 +126,19 @@ export default async function PlayerDashboardPage() {
     tournament_status:
       first(registration.tournaments)?.status ?? "upcoming",
   }));
-  const divisionInvitationState =
+  const [divisionInvitationState, badgeRevealState] = await Promise.all([
     profileResult.error
       ? { status: "error" as const, invitations: [] }
       : !profile
         ? { status: "success" as const, invitations: [] }
-        : await loadPlayerTournamentDivisionInvitations(userId, profile.id);
-  const badgeRevealState = profileResult.error
-    ? { status: "error" as const, code: "award-load-failed" as const }
-    : await loadPlayerBadgeRevealDashboardState(
+        : loadPlayerTournamentDivisionInvitations(userId, profile.id),
+    profileResult.error
+      ? { status: "error" as const, code: "award-load-failed" as const }
+      : loadPlayerBadgeRevealDashboardState(
         supabase,
         profile?.id ?? null
-      );
+      ),
+  ]);
   const badgeLoadError =
     badgeRevealState.status === "error" &&
     badgeRevealState.code === "award-load-failed"
@@ -141,14 +150,20 @@ export default async function PlayerDashboardPage() {
       ? dictionaries.badges.dashboard.loadErrorDescription
       : null;
 
-  const { current: currentRegistrations } =
+  const { current: currentRegistrations, previous: pastRegistrations } =
     groupDashboardRegistrations(registrations);
+  const spotlight = buildDashboardOverviewEvent({
+    notifications: career.notifications,
+    registrations: currentRegistrations,
+    events: eventState.events,
+    profileCompleted: profile?.profile_completed === true,
+  });
   const priority = getCompetitionPriority(
     career.error ? [] : career.notifications,
     currentRegistrations,
     divisionInvitationState.invitations,
   );
-  const sections: CompetitionSection[] = ["matches", "registrations", "invitations"];
+  const sections: CompetitionSection[] = ["registrations", "invitations", "matches"];
   const competitionOrder = priority
     ? [priority.section, ...sections.filter(section => section !== priority.section)]
     : sections;
@@ -157,22 +172,20 @@ export default async function PlayerDashboardPage() {
       Number(right.id === priority.registrationId) - Number(left.id === priority.registrationId))
     : currentRegistrations;
   const competition = {
-    matches: <DashboardNotifications
+    matches: <div id="dashboard-match-actions" className={styles.anchor}><DashboardNotifications
       key={[locale, ...career.notifications.map(notification => `${notification.id}:${notification.status}`)].join("|")}
-      presentation="competition"
+      presentation="dashboard-overview"
       notifications={career.notifications}
       error={career.error ? t(career.error === "load-failed"
         ? "dashboard.career.loadError" : "dashboard.career.partialError") : null}
-    />,
-    registrations: <section data-dashboard-section="registrations" aria-labelledby="dashboard-registrations-title">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 id="dashboard-registrations-title" className="text-base font-bold text-zinc-200">
-          {t("dashboard.competition.registrations")}
-        </h3>
-        {!registrationsResult.error && <p className="text-xs text-zinc-400">
-          {formatDashboardRegistrationCount(currentRegistrations.length, locale, t)}
-        </p>}
-      </div>
+    /></div>,
+    registrations: <DashboardDisclosure
+      icon={Flag}
+      title={t("dashboard.competition.registrations")}
+      detail={registrationsResult.error ? undefined : formatDashboardRegistrationCount(currentRegistrations.length, locale, t)}
+      open={priority?.section === "registrations" || Boolean(registrationsResult.error)}
+      name="registrations"
+    >
       {registrationsResult.error ? (
         <div className="mt-2"><DashboardError message={t("dashboard.registrations.loadError")} /></div>
       ) : visibleRegistrations.length === 0 ? (
@@ -184,43 +197,56 @@ export default async function PlayerDashboardPage() {
           ))}
         </div>
       )}
-    </section>,
-    invitations: <PlayerDivisionInvitations
+      {pastRegistrations.length > 0 && (
+        <DashboardDisclosure icon={ClipboardList} title="Past registrations" detail={formatDashboardRegistrationCount(pastRegistrations.length, locale, t)}>
+          <div className="grid gap-2">
+            {pastRegistrations.map(registration => (
+              <RegistrationCard key={registration.id} registration={registration} locale={locale} t={t} historical />
+            ))}
+          </div>
+        </DashboardDisclosure>
+      )}
+    </DashboardDisclosure>,
+    invitations: <DashboardDisclosure
+      icon={ClipboardList}
+      title={t("dashboard.competition.invitations")}
+      open={priority?.section === "invitations" || divisionInvitationState.status === "error"}
+    ><PlayerDivisionInvitations
       invitations={divisionInvitationState.invitations}
       loadError={divisionInvitationState.status === "error"}
-    />,
+    /></DashboardDisclosure>,
   };
+
+  const careerError = career.error ? t(career.error === "load-failed"
+    ? "dashboard.career.loadError" : "dashboard.career.partialError") : null;
 
   return (
     <main
-      className={`${styles.dashboard} min-h-screen px-3 pb-16 pt-24 text-white sm:px-6 sm:pt-28 lg:pb-20`}
+      className={`${styles.dashboard} min-h-screen px-3 pb-16 pt-20 sm:px-6 sm:pt-24 lg:pb-20`}
       data-dashboard-command-centre
     >
-      <div className="relative z-10 mx-auto max-w-7xl">
-        <DashboardRegistrationNavigation key={currentRegistrations.map((registration) => registration.id).join("|")} />
-        <DashboardIdentity
-          profile={profile}
-          error={Boolean(profileResult.error)}
-          locale={locale}
-          t={t}
-          showcaseEnabled={showcaseEnabled}
-          wardrobeEnabled={isReadyWardrobePilotEnabled()}
-        />
-
-        <div className="mt-4 grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(17rem,0.46fr)] lg:gap-6" data-dashboard-section="current-actions">
-          <section className="min-w-0" aria-labelledby="dashboard-competition-title">
-            <div className="mb-2 flex flex-wrap items-center justify-between gap-x-3">
-              <h2 id="dashboard-competition-title" className="text-xl font-black tracking-tight text-white sm:text-2xl">
+      <DashboardRegistrationNavigation key={currentRegistrations.map(registration => registration.id).join("|")} />
+      <DashboardSections
+        wardrobeEnabled={isReadyWardrobePilotEnabled()}
+        profileHref={profile ? `/players/${encodeURIComponent(profile.id)}` : null}
+        introduction={<>
+          <DashboardIdentity profile={profile} error={Boolean(profileResult.error)} locale={locale} t={t} />
+          <DashboardOverviewEvent event={spotlight} locale={locale} />
+        </>}
+        overview={<div className={styles.overviewGrid} data-dashboard-section="current-actions">
+          <section className={styles.panel} aria-labelledby="dashboard-competition-title">
+            <div className={styles.panelHeading}>
+              <h2 id="dashboard-competition-title">
                 {t("dashboard.competition.title")}
               </h2>
-              {(currentRegistrations.length > 0 || registrationsResult.error) && <Link
+              <Link
                 href="/tournaments"
-                className="inline-flex min-h-11 items-center gap-1.5 rounded-sm px-1 text-sm font-semibold text-orange-200 hover:text-orange-100 focus-visible:outline-2 focus-visible:outline-orange-300"
+                className={styles.textAction}
               >
-                {t("dashboard.profile.goTournaments")} <ArrowUpRight size={15} aria-hidden="true" />
-              </Link>}
+                {t("dashboard.profile.goTournaments")} <ArrowUpRight size={14} aria-hidden="true" />
+              </Link>
             </div>
-            <div className="grid gap-3">
+            <div>
               {competitionOrder.map(section => (
                 <div key={section} data-competition-group={section}
                   className={priority?.section === section ? styles.priority : undefined}>
@@ -229,7 +255,7 @@ export default async function PlayerDashboardPage() {
               ))}
             </div>
           </section>
-          <aside id="player-notifications" className="min-w-0 scroll-mt-28" aria-label={t("dashboard.competition.updates")}>
+          <aside id="player-notifications" className={`${styles.anchor} ${styles.updates}`} aria-label={t("dashboard.competition.updates")}>
             <InAppNotificationCenter
               key={[
                 locale,
@@ -251,22 +277,20 @@ export default async function PlayerDashboardPage() {
               error={playerNotifications.error}
             />
           </aside>
-        </div>
-
-        <div
-          className="mt-5 grid items-start gap-5 border-t border-white/15 pt-4 lg:grid-cols-[minmax(0,1fr)_minmax(17rem,0.46fr)] lg:gap-6"
-        >
-          <div className="min-w-0">
-            {!career.error && <DashboardPerformance statistics={career.statistics} locale={locale} t={t} />}
-            <DashboardCareerHistory
-              matches={career.matchHistory}
-              champions={career.champions}
-              loadError={career.error ? t(career.error === "load-failed"
-                ? "dashboard.career.loadError" : "dashboard.career.partialError") : null}
-            />
-          </div>
-          <div className="min-w-0 [&>section:first-child]:mt-0">
-            <DashboardBadgesSection
+        </div>}
+        hub={<div className={styles.hub}>
+          <h1 className={styles.viewHeading}>Player hub</h1>
+          {career.error
+            ? <DashboardError message={careerError ?? t("dashboard.career.loadError")} />
+            : <DashboardPerformance statistics={career.statistics} locale={locale} t={t} />}
+          <div className={styles.hubGrid}>
+            <section className={styles.panel} aria-labelledby="dashboard-career-community">
+              <div className={styles.panelHeading}><h2 id="dashboard-career-community">Career &amp; community</h2></div>
+              <DashboardDisclosure icon={Flag} title={t("dashboard.career.title")} description="Tournaments, championships and match details">
+                <DashboardCareerHistory matches={career.matchHistory} champions={career.champions} loadError={careerError} />
+              </DashboardDisclosure>
+              <DashboardDisclosure icon={Award} title="Badge collection" description="Earned badges, details and pending reveals">
+                <DashboardBadgesSection
               badgeData={badgeRevealState.status === "success" ? badgeRevealState.badgeData : null}
               pendingReveals={badgeRevealState.status === "success" ? badgeRevealState.pendingReveals : []}
               acknowledgeRevealAction={acknowledgeBadgeReveal}
@@ -274,32 +298,77 @@ export default async function PlayerDashboardPage() {
               revealLoadError={badgeRevealLoadError}
               dictionary={dictionaries.badges}
               locale={locale}
-            />
+                />
+              </DashboardDisclosure>
 
-            <div id="community-polls" className="mt-4 scroll-mt-28" data-dashboard-section="community">
-              <PollsAndDecisions
+              <DashboardDisclosure icon={ListChecks} title="Community polls" description="Ballots and published results">
+                <div id="community-polls" className={styles.anchor} data-dashboard-section="community">
+                  <PollsAndDecisions
                 surface="community"
                 density="compact"
                 initialPolls={communityPolls.polls}
                 initialError={communityPolls.error}
-              />
-            </div>
-
-            {profile && <section className="mt-4" aria-labelledby="dashboard-visibility-title" data-dashboard-section="profile-visibility">
-              <h2 id="dashboard-visibility-title" className="text-xl font-bold text-white">
-                {t("dashboard.utilities.title")}
-              </h2>
-              <div className="mt-2">
-                <DiscordContactVisibilityCard
-                  initialEnabled={Boolean(profile.discord_public_enabled)}
-                  hasDiscordUsername={Boolean(profile.discord_username?.trim())}
-                />
-              </div>
-            </section>}
+                  />
+                </div>
+              </DashboardDisclosure>
+            </section>
+            <section className={styles.panel} aria-labelledby="dashboard-profile-settings">
+              <div className={styles.panelHeading}><h2 id="dashboard-profile-settings">Profile &amp; settings</h2></div>
+              <DashboardLink icon={UserRound} href="/profile" title={t(profile?.profile_completed ? "dashboard.profile.viewEdit" : "dashboard.profile.complete")} description="Player details and linked accounts" />
+              {showcaseEnabled && <DashboardLink icon={Images} href="/dashboard/showcase" title={t("showcase.manage")} description="Current Thought and featured achievement" />}
+              {profile && <DashboardDisclosure icon={Eye} title="Profile visibility" description="Discord contact preferences">
+                <div id="dashboard-visibility" className={styles.anchor} data-dashboard-section="profile-visibility">
+                  <DiscordContactVisibilityCard
+                    initialEnabled={Boolean(profile.discord_public_enabled)}
+                    hasDiscordUsername={Boolean(profile.discord_username?.trim())}
+                  />
+                </div>
+              </DashboardDisclosure>}
+            </section>
           </div>
-        </div>
-      </div>
+        </div>}
+      />
     </main>
+  );
+}
+
+function DashboardDisclosure({ icon: Icon, title, description, detail, name, open, children }: {
+  icon: LucideIcon;
+  title: string;
+  description?: string;
+  detail?: string;
+  name?: string;
+  open?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <details className={styles.disclosure} open={open} data-dashboard-section={name}>
+      <summary className={styles.row}>
+        <Icon aria-hidden size={17} className={styles.rowIcon} />
+        <span className={styles.rowTitle}>
+          <strong>{title}</strong>
+          {description && <small>{description}</small>}
+        </span>
+        {detail && <small>{detail}</small>}
+        <ChevronDown aria-hidden size={15} className={styles.chevron} />
+      </summary>
+      <div className={styles.disclosureBody}>{children}</div>
+    </details>
+  );
+}
+
+function DashboardLink({ icon: Icon, title, description, href }: {
+  icon: LucideIcon;
+  title: string;
+  description: string;
+  href: string;
+}) {
+  return (
+    <Link href={href} className={styles.row} prefetch={false}>
+      <Icon aria-hidden size={17} className={styles.rowIcon} />
+      <span className={styles.rowTitle}><strong>{title}</strong><small>{description}</small></span>
+      <ChevronRight aria-hidden size={15} className={styles.chevron} />
+    </Link>
   );
 }
 

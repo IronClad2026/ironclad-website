@@ -14,6 +14,17 @@ const loadPlayerCareerDashboardMock = vi.hoisted(() => vi.fn());
 const loadPlayerNotificationsMock = vi.hoisted(() => vi.fn());
 const loadCommunityPollsForRequestMock = vi.hoisted(() => vi.fn());
 const pollsAndDecisionsMock = vi.hoisted(() => vi.fn(() => null));
+const loadDashboardOverviewEventsMock = vi.hoisted(() => vi.fn());
+
+vi.mock("@/components/dashboard/overview-event-data", () => ({
+  loadDashboardOverviewEvents: loadDashboardOverviewEventsMock,
+}));
+vi.mock("@/lib/player-showcase/read", () => ({
+  getPlayerShowcaseEnabled: vi.fn(async () => false),
+}));
+vi.mock("@/lib/badges/reveals", () => ({
+  loadPlayerBadgeRevealDashboardState: vi.fn(async () => ({ status: "error", code: "award-load-failed" })),
+}));
 
 vi.mock("@clerk/nextjs/server", () => ({
   auth: authMock,
@@ -85,6 +96,7 @@ const ordinaryNotifications = [
 
 describe("dashboard notification reachability", () => {
   beforeEach(() => {
+    loadDashboardOverviewEventsMock.mockResolvedValue({ events: [], error: false });
     authMock.mockResolvedValue({ userId: "user_reachability_player" });
     createAuthenticatedSupabaseClientMock.mockResolvedValue(
       createDashboardClient()
@@ -128,7 +140,7 @@ describe("dashboard notification reachability", () => {
 
     expect(dashboardNotifications).toHaveLength(1);
     expect(dashboardNotifications[0].props).toEqual({
-      presentation: "competition",
+      presentation: "dashboard-overview",
       notifications: matchNotifications,
       error: null,
     });
@@ -232,6 +244,8 @@ function findElements(
     }
 
     visit(candidate.props.children as ReactNode);
+    if (candidate.props.overview) visit(candidate.props.overview as ReactNode);
+    if (candidate.props.hub) visit(candidate.props.hub as ReactNode);
   }
 
   visit(node);

@@ -56,6 +56,12 @@ vi.mock("@/lib/player-dashboard", () => ({
 vi.mock("@/lib/player-polls", () => ({
   loadCommunityPollsForRequest: loadCommunityPollsForRequestMock,
 }));
+vi.mock("@/components/dashboard/overview-event-data", () => ({
+  loadDashboardOverviewEvents: vi.fn(async () => ({ events: [], error: false })),
+}));
+vi.mock("@/lib/player-showcase/read", () => ({
+  getPlayerShowcaseEnabled: vi.fn(async () => false),
+}));
 vi.mock("@/lib/tournament-division-invitations", () => ({
   loadPlayerTournamentDivisionInvitations:
     loadPlayerTournamentDivisionInvitationsMock,
@@ -298,6 +304,7 @@ function findElements(
     if (!isValidElement<Record<string, unknown>>(candidate)) return;
     if (candidate.type === type) matches.push(candidate);
     visit(candidate.props.children as ReactNode);
+    visit(candidate.props.hub as ReactNode);
   }
 
   visit(node);

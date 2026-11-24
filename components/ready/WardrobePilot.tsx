@@ -2,7 +2,7 @@
 
 import { useAuth } from "@clerk/nextjs";
 import Link from "next/link";
-import { Expand, ImageIcon, LockKeyhole, Menu, Minus, Plus, SlidersHorizontal, X } from "lucide-react";
+import { ChevronDown, Expand, ImageIcon, LockKeyhole, Menu, Minus, Plus, SlidersHorizontal, X } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { READY_DOCK_POSTER_DATA } from "@/lib/ready/poster-data";
 import {
@@ -26,6 +26,9 @@ import {
   type TalkStyle,
 } from "./renderer";
 import styles from "./WardrobePilot.module.css";
+
+export type DashboardWardrobeMode = "overview" | "wardrobe";
+type DashboardWardrobeControls = { mode: DashboardWardrobeMode; onBrowseItems: () => void; active?: boolean };
 
 const control = "min-h-11 rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm font-semibold text-zinc-100 hover:border-orange-500 focus-visible:outline-2 focus-visible:outline-orange-400 disabled:opacity-50";
 const selected = "aria-pressed:border-orange-400 aria-pressed:text-orange-300";
@@ -69,24 +72,31 @@ function WardrobeThumbnail({ src }: { src: string }) {
     src={inRange ? src : undefined} width={56} height={56} decoding="async" alt="" />;
 }
 
-export default function WardrobePilot({ initial = emptyWardrobe, embedded = false }: {
+export default function WardrobePilot({ initial = emptyWardrobe, embedded = false, dashboard }: {
   initial?: WardrobeState;
   embedded?: boolean;
+  dashboard?: DashboardWardrobeControls;
 }) {
   const { isLoaded, sessionId, isSignedIn } = useAuth();
   const activeSession = isLoaded && isSignedIn ? sessionId ?? null : null;
   const initialState = isLoaded && initial.sessionId === activeSession ? initial : emptyWardrobe;
   return <WardrobePreview key={isLoaded ? activeSession ?? "visitor" : "loading"}
-    initial={initialState} sessionId={activeSession} embedded={embedded} />;
+    initial={initialState} sessionId={activeSession} embedded={embedded} dashboard={dashboard} />;
 }
 
-function WardrobePreview({ initial, sessionId, embedded }: {
+function WardrobePreview({ initial, sessionId, embedded, dashboard }: {
   initial: WardrobeState;
   sessionId: string | null;
   embedded: boolean;
+  dashboard?: DashboardWardrobeControls;
 }) {
+  const overview = dashboard?.mode === "overview";
+  const activePreview = dashboard?.active ?? true;
   const canvas = useRef<HTMLCanvasElement>(null);
   const renderer = useRef<MascotRenderer>(null);
+  const useDockFraming = useRef(overview);
+  const presented = useRef(activePreview);
+  const setPresented = useRef<(value: boolean) => void>(null);
   const lifetime = useRef<AbortController>(null);
   const refreshJob = useRef<AbortController>(null);
   const preparing = useRef<AbortController>(null);
@@ -115,7 +125,7 @@ function WardrobePreview({ initial, sessionId, embedded }: {
   const removeTrigger = useRef<HTMLButtonElement>(null);
   const uid = useId();
   const catalogueId = uid + "-catalogue";
-  const catalogueVisible = !embedded || browse === "visible";
+  const catalogueVisible = !overview && (!embedded || browse === "visible");
   const [angle, setAngle] = useState<MascotView>("front");
   const [size, setSize] = useState<"Desktop" | 51 | 56>("Desktop");
   const entitled = state.access !== "locked";
@@ -127,6 +137,18 @@ function WardrobePreview({ initial, sessionId, embedded }: {
   const assetUrl = (id: WardrobeItemId, view: "standalone" | "fitted") =>
     wardrobeAssetUrl(id, view + (entitled ? ".webp" : "-blur.webp"));
   const presetThumbnail = assetUrl(presetThumbnailId, "standalone");
+  const visibleIds = visibleItems.split(",");
+  const currentLook = dashboard && (wardrobeItems.filter(item => visibleIds.includes(item.id)).map(item => item.name).join(", ") || "Stock Ready");
+
+  useEffect(() => {
+    useDockFraming.current = overview || size !== "Desktop";
+    renderer.current?.setMode(useDockFraming.current ? "dock" : "floating");
+  }, [overview, size]);
+
+  useEffect(() => {
+    presented.current = activePreview;
+    setPresented.current?.(activePreview);
+  }, [activePreview]);
 
   useEffect(() => {
     if (artwork) artworkDialog.current?.showModal();
@@ -163,7 +185,7 @@ function WardrobePreview({ initial, sessionId, embedded }: {
       setState(emptyWardrobe);
     }
     const refresh = async (received?: WardrobeState) => {
-      if (!sessionId || saving.current || active.signal.aborted) return;
+      if (!sessionId || !presented.current || saving.current || active.signal.aborted) return;
       if (received) refreshJob.current?.abort();
       else if (refreshJob.current) return;
       const attempt = new AbortController();
@@ -200,6 +222,13 @@ function WardrobePreview({ initial, sessionId, embedded }: {
       if (state) void refresh(state);
       else lock();
     });
+    setPresented.current = visible => {
+      controller?.setVisible(visible);
+      if (!visible) {
+        refreshJob.current?.abort();
+        refreshJob.current = null;
+      } else if (controller && !document.hidden) void refresh();
+    };
     void loadMascotRenderer().then(create => {
       if (active.signal.aborted || !canvas.current) return;
       controller = create({
@@ -211,7 +240,8 @@ function WardrobePreview({ initial, sessionId, embedded }: {
         },
       });
       renderer.current = controller;
-      controller.setMode("floating");
+      controller.setVisible(presented.current);
+      controller.setMode(useDockFraming.current ? "dock" : "floating");
       void refresh();
     }).catch(() => {
       if (active.signal.aborted) return;
@@ -227,6 +257,7 @@ function WardrobePreview({ initial, sessionId, embedded }: {
     return () => {
       active.abort();
       if (unobserve) unobserve();
+      setPresented.current = null;
       refreshJob.current?.abort();
       refreshJob.current = null;
       preparing.current?.abort();
@@ -310,7 +341,6 @@ function WardrobePreview({ initial, sessionId, embedded }: {
 
   function resizePreview(value: typeof size) {
     setSize(value);
-    renderer.current?.setMode(value === "Desktop" ? "floating" : "dock");
   }
 
   const PreviewHeading = embedded ? "h4" : "h2";
@@ -318,12 +348,14 @@ function WardrobePreview({ initial, sessionId, embedded }: {
   const workspace = (
     <div className={styles.container}>
       <div className={styles.workspace} data-ready-wardrobe-workspace=""
-        data-browse-open={embedded ? catalogueVisible : undefined}>
+        data-browse-open={embedded ? catalogueVisible : undefined} data-dashboard-mode={dashboard?.mode}>
       <section className={styles.studio} data-larger={larger} aria-labelledby={uid + "-preview"}>
         <div className={styles.previewSummary}>
-          <PreviewHeading id={uid + "-preview"} className={styles.previewHeading}>Ready preview</PreviewHeading>
+          <PreviewHeading id={uid + "-preview"} className={styles.previewHeading}>
+            {overview ? "Ready Wardrobe" : dashboard ? "Current look" : "Ready preview"}
+          </PreviewHeading>
           <div className={styles.stage}>
-            <div className={styles.model} style={size === "Desktop" ? undefined : { width: size }}>
+            <div className={styles.model} style={overview || size === "Desktop" ? undefined : { width: size }}>
             <canvas ref={canvas} aria-label="Ready 3D preview" role="img"
               className="absolute inset-0 size-full" style={{ visibility: status === "ready" ? "visible" : "hidden" }}
               data-wardrobe-renderer={status} data-wardrobe-items={visibleItems} />
@@ -333,7 +365,8 @@ function WardrobePreview({ initial, sessionId, embedded }: {
             )}
             </div>
           </div>
-          <div className={styles.previewActions}>
+          {currentLook && <p className={styles.lookName} title={currentLook}>{currentLook}</p>}
+          <div className={styles.previewActions} hidden={overview}>
             <button type="button" className={`${control} ${styles.resize}`} aria-expanded={larger}
               onClick={() => {
                 resizePreview("Desktop");
@@ -342,13 +375,13 @@ function WardrobePreview({ initial, sessionId, embedded }: {
               <Expand aria-hidden="true" size={16} /> {larger ? "Compact preview" : "Larger preview"}
             </button>
           </div>
-          <p className={styles.feedback} role="status">
+          <p className={styles.feedback} role="status" hidden={overview}>
             {pending ? "Updating Ready’s look…" : message || (status === "loading" ? "Loading preview…" :
               status === "error" ? "Live preview unavailable. Item artwork is still available." : "")}
           </p>
         </div>
-        <div className={embedded ? styles.studioTools : "contents"}>
-          {embedded && (
+        <div className={embedded ? styles.studioTools : "contents"} hidden={overview}>
+          {embedded && !dashboard && (
             <button type="button" ref={browseToggle} className={`${control} ${styles.browseToggle}`}
               aria-controls={catalogueId} aria-expanded={catalogueVisible}
               onClick={() => setBrowse(value => value === "visible" ? "hidden" : "visible")}>
@@ -395,21 +428,39 @@ function WardrobePreview({ initial, sessionId, embedded }: {
         </details>
         </div>
       </section>
+      <div className={dashboard ? styles.disclosurePanel : "contents"}>
+      {dashboard && (
+        <button type="button" ref={browseToggle} className={styles.dashboardBrowse}
+          aria-controls={catalogueId} aria-expanded={catalogueVisible}
+          onClick={() => {
+            if (overview) {
+              setBrowse("visible");
+              dashboard.onBrowseItems();
+            } else setBrowse(value => value === "visible" ? "hidden" : "visible");
+          }}>
+          <Menu size={16} aria-hidden="true" />
+          {catalogueVisible ? "Hide items" : "Browse items"}
+          {!overview && <ChevronDown size={16} className={styles.browseChevron} aria-hidden="true" />}
+        </button>
+      )}
       <section id={catalogueId} className={styles.catalogue} aria-label="Ready items" hidden={!catalogueVisible}>
         {(!embedded || browse !== "unopened") && <>
         <div className={styles.toolbar}>
           <div className={styles.tabs} aria-label="Catalogue view" role="group">
-            <button type="button" aria-pressed={tab === "browse"} onClick={() => setTab("browse")}>Browse</button>
+            <button type="button" aria-pressed={tab === "browse"} onClick={() => setTab("browse")}>{dashboard ? "Catalogue" : "Browse"}</button>
             <button type="button" ref={equippedTab} aria-pressed={tab === "equipped"} onClick={() => setTab("equipped")}>
               Equipped ({state.itemIds.length})
             </button>
           </div>
           {tab === "browse" && (
-            <select aria-label="Category" className={styles.category} value={category}
-              onChange={event => setCategory(event.target.value)}>
-              <option value="">All categories</option>
-              {categoryOptions.map(value => <option key={value} value={value}>{value}</option>)}
-            </select>
+            <label className={dashboard ? styles.dashboardCategory : "contents"}>
+              {dashboard && <span>Category</span>}
+              <select aria-label="Category" className={styles.category} value={category}
+                onChange={event => setCategory(event.target.value)}>
+                <option value="">All categories</option>
+                {categoryOptions.map(value => <option key={value} value={value}>{value}</option>)}
+              </select>
+            </label>
           )}
         </div>
         {!entitled && <p className={styles.notice}>
@@ -436,7 +487,7 @@ function WardrobePreview({ initial, sessionId, embedded }: {
             : <span className={styles.lock}><LockKeyhole size={14} aria-hidden="true" /> Locked</span>}
         </div>}
         {listedItems.length === 0 && (
-          <p className={styles.notice}>{tab === "equipped" ? "No items equipped. Choose an item in Browse to change Ready’s look." : "No items in this category."}</p>
+          <p className={styles.notice}>{tab === "equipped" ? `No items equipped. Choose an item in ${dashboard ? "Catalogue" : "Browse"} to change Ready’s look.` : "No items in this category."}</p>
         )}
         <ul className={styles.items}>
           {listedItems.map(item => {
@@ -457,7 +508,9 @@ function WardrobePreview({ initial, sessionId, embedded }: {
                 </button>
                 <div className={styles.itemCopy}>
                   <ItemHeading>{item.name}</ItemHeading>
-                  <p>{categories[item.slot]}</p>
+                  <p className={dashboard && equipped ? styles.itemEquipped : undefined}>
+                    {dashboard && equipped ? "Equipped" : categories[item.slot]}
+                  </p>
                   {entitled && constraint && <p className={styles.constraint}>
                     {equipped && !constraint.startsWith("Hidden") ? "Saved · " : ""}{constraint}
                   </p>}
@@ -479,6 +532,7 @@ function WardrobePreview({ initial, sessionId, embedded }: {
         </ul>
         </>}
       </section>
+      </div>
       </div>
       <dialog ref={artworkDialog} className={styles.artworkDialog} aria-labelledby={uid + "-artwork"}
         onClose={() => {
