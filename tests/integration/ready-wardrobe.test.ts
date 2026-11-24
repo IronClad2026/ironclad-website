@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { GET, HEAD } from "@/app/api/ready/wardrobe/assets/[itemId]/[file]/route";
 import { POST } from "@/app/api/ready/wardrobe/route";
-import { parseWardrobeSelection } from "@/lib/wardrobe/catalogue";
+import { parseWardrobeSelection, toggleDynamiteSet, toggleWardrobeItem, visibleWardrobeItems, wardrobeItems, type WardrobeSelection } from "@/lib/wardrobe/catalogue";
 
 const mocks = vi.hoisted(() => ({
   enabled: vi.fn(),
@@ -27,10 +27,10 @@ const aviators = "eyewear_smoked_aviators";
 const demoSession = "session-test";
 const owner = "player-own";
 
-function asset(file: string, method = "GET") {
+function asset(file: string, method = "GET", itemId = aviators) {
   return {
-    request: new Request(`${origin}/api/ready/wardrobe/assets/${aviators}/${file}`, { method }),
-    context: { params: Promise.resolve({ itemId: aviators, file }) },
+    request: new Request(`${origin}/api/ready/wardrobe/assets/${itemId}/${file}`, { method }),
+    context: { params: Promise.resolve({ itemId, file }) },
   };
 }
 
@@ -107,5 +107,53 @@ describe("Ready Wardrobe pilot", () => {
     expect(parseWardrobeSelection(["unreleased_item"])).toBeNull();
     const complete = [aviators, "mouth_cigarette", "face_clown_makeup"];
     expect(parseWardrobeSelection(complete)).toEqual(complete);
+  });
+
+  it("gates every clear catalogue item and dependency while serving separately rendered teasers", async () => {
+    expect(wardrobeItems).toHaveLength(20);
+    for (const item of wardrobeItems) {
+      const sharp = asset("fitted.webp", "GET", item.id);
+      const blurred = asset("fitted-blur.webp", "GET", item.id);
+      expect((await GET(sharp.request, sharp.context)).status).toBe(403);
+      expect((await GET(blurred.request, blurred.context)).status).toBe(200);
+    }
+    for (const [id, file] of [
+      ["headwear_tanker_beret", "helmet-free-r5.glb"],
+      ["headwear_open_cranium", "cranium-r2-fitting.glb"],
+      ["mouth_cigarette", "repaired-bite.glb"],
+      ["face_clown_makeup", "lower-basecolor.png"],
+    ]) {
+      const dependency = asset(file, "GET", id);
+      expect((await GET(dependency.request, dependency.context)).status).toBe(403);
+    }
+    expect(mocks.download).toHaveBeenCalledWith("v2/tankers_crown/fitted-blur.webp", {}, expect.anything());
+  });
+
+  it("hides stock-only mounts with replacement headwear and restores unrelated choices", () => {
+    const prior: WardrobeSelection = { itemIds: [aviators, "helmet_trim_lucky_dog_tags", "mouth_cigarette"] };
+    const beret = toggleWardrobeItem(prior, "headwear_tanker_beret");
+    expect(visibleWardrobeItems(beret)).toEqual([aviators, "headwear_tanker_beret"]);
+    const full = toggleWardrobeItem(beret, "headwear_wwii_full_face_helmet");
+    expect(visibleWardrobeItems(full)).toEqual(["headwear_wwii_full_face_helmet"]);
+    expect(toggleWardrobeItem(full, "headwear_wwii_full_face_helmet")).toEqual(prior);
+  });
+
+  it("round-trips the set with either component already equipped and keeps later unrelated edits", async () => {
+    const band = "helmet_trim_dynamite_helmet_band";
+    const stick = "mouth_sparking_dynamite_stick";
+    mocks.authority.mockResolvedValue({ access: "admin", sessionId: demoSession, userId: owner });
+    for (const prior of [band, stick] as const) {
+      const outfit = toggleDynamiteSet({ itemIds: [prior] });
+      expect(visibleWardrobeItems(outfit)).toEqual([band, stick]);
+      const response = await save({ sessionId: demoSession, ...outfit });
+      expect(response.status).toBe(200);
+      const saved = await response.json() as WardrobeSelection;
+      expect(mocks.upsert.mock.lastCall?.[0]).toMatchObject({
+        item_ids: [], catalogue_item_ids: [band, stick], dynamite_restore: [prior],
+      });
+      expect(toggleDynamiteSet(toggleWardrobeItem(saved, aviators))).toEqual({ itemIds: [aviators, prior] });
+    }
+    expect((await save({ sessionId: demoSession, itemIds: [stick], dynamiteRestore: [] })).status).toBe(400);
+    expect((await save({ sessionId: demoSession, itemIds: [stick, "mouth_cigarette"] })).status).toBe(400);
   });
 });

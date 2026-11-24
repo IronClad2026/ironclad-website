@@ -5,6 +5,7 @@ on:
     branches:
       - codex/ready-wardrobe-pilot
       - codex/ready-wardrobe-dashboard
+      - codex/ready-wardrobe-catalogue
 
 permissions:
   contents: read
@@ -43,3 +44,19 @@ jobs:
           tests/integration/leaderboard-public-projection.test.ts
           tests/integration/public-content-alignment.test.ts
       - run: npm run build
+  verify-catalogue-database:
+    if: github.ref == 'refs/heads/codex/ready-wardrobe-catalogue'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22.12.0
+      - name: Verify wardrobe changes in disposable PostgreSQL
+        run: |
+          pg_bin="$(pg_config --bindir)"
+          "$pg_bin/initdb" -D "$RUNNER_TEMP/catalogue-pg" -U postgres -A trust --no-locale --encoding=UTF8
+          "$pg_bin/pg_ctl" -D "$RUNNER_TEMP/catalogue-pg" -l "$RUNNER_TEMP/catalogue-pg.log" -o "-h 127.0.0.1 -p 56623 -k $RUNNER_TEMP" -w start
+          trap '"$pg_bin/pg_ctl" -D "$RUNNER_TEMP/catalogue-pg" -m fast -w stop' EXIT
+          node scripts/ready/wardrobe-catalogue-database.mjs "$pg_bin/psql"

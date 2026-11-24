@@ -83,6 +83,7 @@ export type MascotRenderer = {
     discard(): void;
   }>;
   clearWardrobe(): void;
+  commandWardrobe(action: "lower-visor" | "raise-visor" | "play-gaze-cues"): void;
   snapshot(): MascotSnapshot | null;
   measure(durationMs?: number): Promise<MascotFrameReport>;
   dispose(): void;
@@ -92,6 +93,7 @@ type Factory = (options: {
   canvas: HTMLCanvasElement;
   onStatus?: (status: MascotStatus, error?: Error) => void;
   onAnchor?: (anchor: Anchor) => void;
+  onWardrobeCaption?: (caption: string) => void;
   wardrobe?: boolean;
 }) => MascotRenderer;
 

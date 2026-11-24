@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import WardrobePilot from "@/components/ready/WardrobePilot";
 
@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   prepare: vi.fn(),
   commit: vi.fn(),
 }));
+const initial = { access: "admin", sessionId: "test-session", itemIds: [] } as const;
 
 vi.mock("@clerk/nextjs", () => ({
   useAuth: () => ({ isLoaded: true, isSignedIn: true, sessionId: "test-session" }),
@@ -19,11 +20,14 @@ vi.mock("@/components/ready/renderer", () => ({
   },
 }));
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+  vi.unstubAllGlobals();
+});
 
 it("applies an Equip click while a passive permission refresh is still pending", async () => {
   const ids = ["face_clown_makeup"];
-  const initial = { access: "admin", sessionId: "test-session", itemIds: [] } as const;
   let refreshSignal: AbortSignal | null | undefined;
   const request = vi.fn((_url: string, init: RequestInit) => {
     if (init.method === "POST") return Promise.resolve(Response.json({ ...initial, itemIds: ids }));
@@ -51,4 +55,39 @@ it("applies an Equip click while a passive permission refresh is still pending",
     body: JSON.stringify({ sessionId: "test-session", itemIds: ids }),
   }));
   expect(mocks.commit).toHaveBeenCalledOnce();
+});
+
+it("aborts obsolete preparation and saves only the latest outfit", async () => {
+  mocks.prepare.mockImplementationOnce((_ids, signal: AbortSignal) =>
+    new Promise((_, reject) => signal.addEventListener("abort", () => reject(signal.reason), { once: true })),
+  ).mockResolvedValueOnce({ commit: mocks.commit, discard: vi.fn() });
+  const request = vi.fn((_url: string, init: RequestInit) => Promise.resolve(Response.json({
+    ...initial, ...(init.method === "POST" ? JSON.parse(String(init.body)) : {}),
+  })));
+  vi.stubGlobal("fetch", request);
+  render(<WardrobePilot initial={{ ...initial, itemIds: [] }} />);
+  const first = screen.getByRole("button", { name: "Equip Smoked Aviators" });
+  await waitFor(() => expect(first).toBeEnabled());
+  fireEvent.click(first);
+  fireEvent.click(screen.getByRole("button", { name: "Equip Tanker Dust Goggles" }));
+  await waitFor(() => expect(mocks.commit).toHaveBeenCalledOnce());
+  expect(request.mock.calls.filter(([, init]) => init.method === "POST")).toEqual([
+    ["/api/ready/wardrobe", expect.objectContaining({
+      body: JSON.stringify({ sessionId: initial.sessionId, itemIds: ["eyewear_tanker_dust_goggles"] }),
+    })],
+  ]);
+});
+
+it("leaves the prior outfit visible and saves nothing if a set resource fails", async () => {
+  mocks.prepare.mockRejectedValueOnce(new Error("Missing set component"));
+  const request = vi.fn(() => Promise.resolve(Response.json(initial)));
+  vi.stubGlobal("fetch", request);
+  render(<WardrobePilot initial={{ ...initial, itemIds: [] }} />);
+  const equip = screen.getByRole("button", { name: "Equip Dynamite Set" });
+  await waitFor(() => expect(equip).toBeEnabled());
+  fireEvent.click(equip);
+  expect(await screen.findByText("Could not update Ready’s look. Try again.")).toBeVisible();
+  expect(screen.getByRole("button", { name: "Equip Dynamite Set" })).toBeEnabled();
+  expect(mocks.commit).not.toHaveBeenCalled();
+  expect(request).toHaveBeenCalledTimes(1);
 });

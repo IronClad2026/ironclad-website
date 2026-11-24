@@ -1,5 +1,5 @@
 import { getWardrobeAuthority, getWardrobeState } from "@/lib/wardrobe/access";
-import { parseWardrobeSelection } from "@/lib/wardrobe/catalogue";
+import { parseWardrobeOutfit, pilotWardrobeItems, type WardrobeSelection } from "@/lib/wardrobe/catalogue";
 import { isReadyWardrobePilotEnabled } from "@/lib/wardrobe/environment";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 
@@ -25,9 +25,9 @@ export async function POST(request: Request) {
 
   const reader = request.body?.getReader();
   if (!reader) return Response.json({}, { status: 400, headers });
-  let itemIds;
+  let outfit: WardrobeSelection | null;
   try {
-    const buffer = new Uint8Array(512);
+    const buffer = new Uint8Array(2048);
     let size = 0;
     for (;;) {
       const { value, done } = await reader.read();
@@ -37,18 +37,22 @@ export async function POST(request: Request) {
       size += value.length;
     }
     const input = JSON.parse(new TextDecoder().decode(buffer.subarray(0, size)));
-    itemIds = input?.sessionId === authority.sessionId && parseWardrobeSelection(input?.itemIds);
+    outfit = input?.sessionId === authority.sessionId
+      ? parseWardrobeOutfit(input.itemIds, input.dynamiteRestore)
+      : null;
   } catch {
     return Response.json({}, { status: 400, headers });
   } finally {
     void reader.cancel().catch(() => {});
   }
-  if (!itemIds) return Response.json({}, { status: 400, headers });
+  if (!outfit) return Response.json({}, { status: 400, headers });
   const result = await createSupabaseAdminClient().from("ready_wardrobe_pilot_profiles").upsert({
     clerk_user_id: authority.userId,
-    item_ids: itemIds,
+    item_ids: pilotWardrobeItems(outfit.itemIds),
+    catalogue_item_ids: outfit.itemIds,
+    dynamite_restore: outfit.dynamiteRestore ?? null,
     updated_at: new Date().toISOString(),
   }, { onConflict: "clerk_user_id" }).abortSignal(AbortSignal.timeout(4000));
   if (result.error) return Response.json({}, { status: 503, headers });
-  return Response.json({ access: authority.access, sessionId: authority.sessionId, itemIds }, { headers });
+  return Response.json({ access: authority.access, sessionId: authority.sessionId, ...outfit }, { headers });
 }

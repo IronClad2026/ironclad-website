@@ -1,21 +1,23 @@
 # Ready Wardrobe pilot
 
-Protected `staging` only. Open `/profile/ready` directly or select **Ready Wardrobe** from **Your profile**. The header uses stock Ready. The pilot does not create a purchase, registration, early-entry allowance or tournament discount.
+Protected `staging` only. Select **Open wardrobe** on the dashboard or open `/profile/ready`. Both views share the saved outfit and access checks. The site header uses stock Ready. The pilot grants wardrobe access only.
 
 ## Access and files
 
-- The sharp previews, GLBs and colour maps are in the private `ready-wardrobe-pilot` Storage bucket under `v1/`. The asset route streams only listed files. The separately rendered blurred WebPs are the only unauthenticated variants.
+- The private `ready-wardrobe-pilot` bucket holds the original three items under `v1/` and the 17 additions under `v2/`. The asset route streams only listed files. The separately rendered blurred WebPs are the only unauthenticated variants.
 - A currently verified administrator with satisfied account requirements can equip any pilot item. The sandbox coverage table is time-bounded, read-only for the app and valid only for registered Staging synthetic fixtures with complete player accounts. The admin path has no coverage requirement.
 - The application authorizes every selection read and save. Selection writes are tied to the current Clerk session and account. Expiry or revoked access restores stock Ready while retaining the recorded choice. A new signed-in session starts from its own selection.
-- The catalogue uses the exact approved aviators and cigarette exports. The cigarette swaps the stock skull geometry for a compatible repaired mesh, mounts the palate and lower shelf to their existing controls, and retargets the single smoke emitter. Clown Makeup replaces the colour map independently on the skull and jaw. Removing either item restores the relevant stock state.
+- The two replacement mouth props share the approved repaired bite. Tanker Beret and Australian Slouch Hat share the R5 head and crown liner. Open Cranium uses the matching R2 base. Helmet mounts and replacement mouth props are inactive with a replacement head. The full-face helmet also conceals the face, accessories, smoke and tears. Inactive choices stay in the outfit and return when compatible.
+- Dynamite Set groups the existing band and stick. A single save records both pieces and the affected slots to restore when the set is removed. Other outfit choices remain available.
+- The open viewer keeps active geometry and textures, retains a bounded cache of recently used assets in memory and clears it when the account view or access changes. The dashboard poster requires no wardrobe assets.
 
-`scripts/ready/wardrobe-pilot-upload.mjs` checks the HDD volume, asset manifest digests, Staging Supabase and Clerk targets, and private bucket. It uploads only approved manifest entries and reads their hashes back. Browser captures and part exports belong on HDD 1T. The web page needs only the hosted files.
+`scripts/ready/wardrobe-catalogue-upload.mjs` verifies the approved HDD manifest, Staging environment and private bucket. It uploads the 87 immutable catalogue files and checks their hashes after readback. Browser captures and part exports belong on HDD 1T. The web page needs only the hosted files.
 
 ## Release checks and rollback
 
 Replay the migrations and `tests/database/ready-wardrobe-pilot.sql` in disposable PostgreSQL before applying the additive pilot changes. The existing hosted Relic identity RPC is reconciled by receipt and function definition. It does not need reapplying. Preserve disabled transactional email and blocked Staging push claims.
 
-To pause the pilot, set `READY_WARDROBE_PILOT_DISABLED=true` only for Vercel Preview branch `staging` and redeploy that branch. The profile link, pilot page and pilot asset endpoints close under the same guard. Stock Ready remains in the header. Keep the private objects and selections in place for a retry. Reverting the Staging code to the recorded baseline is also possible. Do not replay historical migrations or alter another environment.
+To pause the pilot, set `READY_WARDROBE_PILOT_DISABLED=true` only for Vercel Preview branch `staging` and redeploy that branch. The dashboard launcher, profile page and asset routes close under the same guard. Stock Ready remains available. Keep the private objects and saved choices. A code rollback to the three-item pilot reads its own subset of the saved outfit. The full selections remain recorded for a later reinstatement.
 
 ## Commercial scope
 

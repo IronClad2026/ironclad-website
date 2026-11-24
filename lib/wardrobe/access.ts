@@ -5,7 +5,7 @@ import { loadAccountLegalGateState } from "@/lib/account-legal-acceptance";
 import { hasCurrentPatch2AdminAccess } from "@/lib/patch2-admin-access";
 import { loadReadyActiveProfile } from "@/lib/ready/platform-data";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
-import { emptyWardrobe, parseWardrobeSelection, type WardrobeState } from "./catalogue";
+import { emptyWardrobe, parseWardrobeOutfit, parseWardrobeSelection, pilotWardrobeItems, type WardrobeState } from "./catalogue";
 import { isReadyWardrobePilotEnabled } from "./environment";
 
 type WardrobeAuthority =
@@ -52,8 +52,21 @@ export async function getWardrobeState(): Promise<WardrobeState> {
   const { access, sessionId } = authority;
   if (authority.access === "locked") return { ...emptyWardrobe, sessionId };
   const { data, error } = await createSupabaseAdminClient().from("ready_wardrobe_pilot_profiles")
-    .select("item_ids").eq("clerk_user_id", authority.userId)
+    .select("item_ids,catalogue_item_ids,dynamite_restore").eq("clerk_user_id", authority.userId)
     .abortSignal(AbortSignal.timeout(4000)).maybeSingle();
   if (error) throw new Error("Could not load the saved Ready wardrobe.");
-  return { access, sessionId, itemIds: parseWardrobeSelection(data?.item_ids) ?? [] };
+  const pilot = parseWardrobeSelection(data?.item_ids) ?? [];
+  const saved = parseWardrobeOutfit(data?.catalogue_item_ids, data?.dynamite_restore);
+  if (!saved) return { access, sessionId, itemIds: pilot };
+  const projected = pilotWardrobeItems(saved.itemIds);
+  if (projected.length === pilot.length && projected.every(id => pilot.includes(id))) {
+    return { access, sessionId, ...saved };
+  }
+  // A previous build may have saved its three-item projection after a rollback.
+  const replacesEyes = pilot.includes("eyewear_smoked_aviators");
+  const replacesMouth = pilot.includes("mouth_cigarette");
+  const active = saved.itemIds.filter(id => !projected.includes(id) &&
+    (!replacesEyes || !id.startsWith("eyewear_")) &&
+    (!replacesMouth || id !== "mouth_sparking_dynamite_stick"));
+  return { access, sessionId, itemIds: [...active, ...pilot] };
 }

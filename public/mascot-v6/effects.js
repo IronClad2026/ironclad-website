@@ -55,12 +55,12 @@ export class Tears {
         this.group.add(mesh);
         return { mesh, age: Infinity, life: 1, strength: 0 };
       });
-      this.routes.push({ points: shapedRoute(points), drops, wait: index * 0.12, sequence: index });
+      this.routes.push({ side, points: shapedRoute(points), drops, wait: index * 0.12, sequence: index });
     }
     this.group.visible = false;
   }
 
-  update(delta, fields, intensity, reducedMotion = false) {
+  update(delta, fields, intensity, reducedMotion = false, mask = null) {
     if (this.reduced !== reducedMotion) {
       this.reduced = reducedMotion;
       for (const route of this.routes) {
@@ -75,6 +75,14 @@ export class Tears {
     this.activeCount = 0;
     for (const route of this.routes) {
       const { points, drops } = route;
+      if (mask === 'all' || mask === route.side) {
+        route.wait = 0;
+        for (const drop of drops) {
+          drop.age = Infinity;
+          drop.mesh.visible = false;
+        }
+        continue;
+      }
       if (!reducedMotion && intensity > .19) {
         // Ease down births as Sad releases. Existing drops keep their own age and opacity.
         route.wait -= delta * intensity;
@@ -183,7 +191,7 @@ export class Smoke {
     }
   }
 
-  update(delta, intensity, camera) {
+  update(delta, intensity, camera, clearance = 1) {
     this.emission += delta;
     const spacing = .071 + .021 * Math.sin(this.cursor * 2.39996);
     if (this.visible && this.emission >= spacing) {
@@ -195,6 +203,7 @@ export class Smoke {
     }
     for (const point of this.points) {
       const { sprite, seed, origin: start } = point;
+      if (clearance <= .001) point.age = Infinity;
       point.age += delta;
       const age = point.age;
       const lifespan = 1.55 + .20 * Math.sin(seed);
@@ -203,8 +212,8 @@ export class Smoke {
       const life = age / lifespan;
       const curl = Math.sin(age * 4.8 + seed * 0.16) * (0.008 + 0.047 * life) * life;
       sprite.position.set(start.x - 0.118 * age - 0.022 * age * age + curl,
-        start.y + 0.255 * age + 0.081 * age * age, start.z + 0.042 * age);
-      sprite.scale.set(0.055 + 0.142 * life, 0.079 + 0.153 * life, 1);
+        start.y + (0.255 * age + 0.081 * age * age) * clearance, start.z + 0.042 * age);
+      sprite.scale.set((0.055 + 0.142 * life) * clearance, (0.079 + 0.153 * life) * clearance, 1);
       sprite.material.rotation = seed + age * 0.42;
       const fadeIn = THREE.MathUtils.smoothstep(life, 0, .16);
       const fadeOut = 1 - THREE.MathUtils.smoothstep(life, .28, 1);

@@ -22,6 +22,9 @@ begin
       raise exception 'Unexpected RLS contract for %', relation;
     end if;
     foreach role_name in array array['anon', 'authenticated'] loop
+    if has_function_privilege(role_name, 'public.ready_wardrobe_catalogue_ids_valid(text[])', 'execute') then
+      raise exception 'Unexpected catalogue validation privilege for %', role_name;
+    end if;
       foreach privilege_name in array array['select', 'insert', 'update', 'delete', 'truncate', 'references', 'trigger'] loop
         if has_table_privilege(role_name, relation, privilege_name) then
           raise exception 'Unexpected % privilege on % for %', privilege_name, relation, role_name;
@@ -134,6 +137,30 @@ begin
      is distinct from array['eyewear_smoked_aviators', 'mouth_cigarette', 'face_clown_makeup'] then
     raise exception 'Verified three-item loadout failed to save';
   end if;
+
+  update public.ready_wardrobe_pilot_profiles
+    set catalogue_item_ids = array['eyewear_smoked_aviators', 'helmet_trim_dynamite_helmet_band', 'mouth_sparking_dynamite_stick'],
+        dynamite_restore = array['mouth_cigarette']
+    where clerk_user_id = 'user_pilot_database_fixture';
+  if (select dynamite_restore from public.ready_wardrobe_pilot_profiles where clerk_user_id = 'user_pilot_database_fixture')
+     is distinct from array['mouth_cigarette'] then
+    raise exception 'Set restoration metadata failed to save';
+  end if;
+  begin
+    update public.ready_wardrobe_pilot_profiles set catalogue_item_ids = array['tankers_crown'];
+    raise exception 'A partial active preset was saved';
+  exception when check_violation then null;
+  end;
+  begin
+    update public.ready_wardrobe_pilot_profiles set catalogue_item_ids = array['tankers_crown','tankers_crown'], dynamite_restore = null;
+    raise exception 'Duplicate expanded loadout was saved';
+  exception when check_violation then null;
+  end;
+  begin
+    update public.ready_wardrobe_pilot_profiles set catalogue_item_ids = array['unreleased'], dynamite_restore = null;
+    raise exception 'Unknown expanded loadout item was saved';
+  exception when check_violation then null;
+  end;
 
   for invalid_items in
     select item_ids from (values

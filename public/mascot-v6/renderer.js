@@ -183,8 +183,12 @@ class MascotScene {
     const vertical = this.size.y * (.50 - .01 * this.framing);
     // At logo size, use one steady fit for the whole attention range. Extra clearance for large looks is floating-only.
     const depthMargin = THREE.MathUtils.lerp(.275, .188 + idleFramingPadding(current.idleGlance), this.framing);
-    const distance = Math.max(vertical, horizontal / this.camera.aspect) / Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2)) + this.size.z * depthMargin;
+    const wardrobeFraming = this.wardrobe?.framing();
+    const stockDistance = Math.max(vertical, horizontal / this.camera.aspect) /
+      Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2)) + this.size.z * depthMargin;
+    const distance = stockDistance * (1 + (wardrobeFraming?.padding ?? 0));
     this.cameraTarget.copy(this.center);
+    this.cameraTarget.y += this.size.y * (wardrobeFraming?.rise ?? 0);
     this.cameraTarget.x -= this.size.x * .035 * this.framing * Math.cos(this.angle);
     this.cameraTarget.z += this.size.x * .035 * this.framing * Math.sin(this.angle);
     this.camera.position.set(Math.sin(this.angle) * distance, this.size.y * .034, Math.cos(this.angle) * distance).add(this.cameraTarget);
@@ -193,9 +197,12 @@ class MascotScene {
 
     const tearIntensity = tears === 'auto' ? clamp(current.fields.Pianto_Espressivo ?? 0) : Number(tears === 'on');
     this.tearEmission = tearIntensity;
-    this.tears.update(delta, current.fields, tearIntensity, reducedMotion);
-    this.smoke.visible = smoke && !reducedMotion;
-    this.smoke.update(delta, this.smoke.visible ? .51 + .49 * this.framing : 0, this.camera);
+    this.wardrobe?.update(delta, options);
+    this.tears.update(delta, current.fields, tearIntensity, reducedMotion, this.wardrobe?.tearMask());
+    this.smoke.visible = smoke && !reducedMotion && (this.wardrobe?.smokeVisible() ?? true);
+    const smokeClearance = this.wardrobe?.smokeScale() ?? 1;
+    const smokeIntensity = (.51 + .49 * this.framing) * smokeClearance;
+    this.smoke.update(delta, this.smoke.visible ? smokeIntensity : 0, this.camera, smokeClearance);
 
     if (this.afterAnchor) {
       const projected = projectPoint(this.mouth.getWorldPosition(this.point), this.camera);
@@ -207,6 +214,16 @@ class MascotScene {
     }
     const start = performance.now();
     this.renderer.render(this.scene, this.camera);
+    if (this.wardrobe) {
+      const canvas = this.renderer.domElement;
+      const items = this.wardrobe.ids.join(',');
+      if (canvas.dataset.wardrobeDrawn !== items) canvas.dataset.wardrobeDrawn = items;
+      const caption = this.wardrobe.caption();
+      if (this.wardrobeCaption !== caption) {
+        this.wardrobeCaption = caption;
+        this.onWardrobeCaption?.(caption);
+      }
+    }
     this.metrics.record(timestamp, performance.now() - start);
   }
 
@@ -252,7 +269,7 @@ class MascotScene {
   }
 }
 
-export function createMascotRenderer({ canvas, onStatus, onAnchor, wardrobe = false }) {
+export function createMascotRenderer({ canvas, onStatus, onAnchor, onWardrobeCaption, wardrobe = false }) {
   const options = { mode: 'dock', view: 'front', dragging: false, reducedMotion: false, smoke: true, tears: 'auto' };
   const abort = new AbortController();
   const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -425,6 +442,7 @@ export function createMascotRenderer({ canvas, onStatus, onAnchor, wardrobe = fa
         const { createWardrobe } = await import('./wardrobe.js');
         if (disposed) return;
         runtime.wardrobe = createWardrobe(runtime, nodeNamed, disposeAsset);
+        runtime.onWardrobeCaption = onWardrobeCaption;
       }
       showExpression(activeExpression, expressionIntensity);
       if (activeTalk && !options.reducedMotion) runtime.pose.playTalk(activeTalk.style, activeTalk.gain);
@@ -494,6 +512,7 @@ export function createMascotRenderer({ canvas, onStatus, onAnchor, wardrobe = fa
       };
     },
     clearWardrobe() { runtime?.wardrobe?.clear(); schedule(); },
+    commandWardrobe(action) { runtime?.wardrobe?.command(action); schedule(); },
     snapshot() { return loaded ? runtime.snapshot() : null; },
     async measure(durationMs = 3500) {
       await ready;

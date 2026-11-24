@@ -6,10 +6,13 @@ import { useEffect, useRef, useState } from "react";
 import { READY_DOCK_POSTER_DATA } from "@/lib/ready/poster-data";
 import {
   emptyWardrobe,
-  parseWardrobeSelection,
+  itemConstraint,
+  toggleDynamiteSet,
+  toggleWardrobeItem,
+  visibleWardrobeItems,
   wardrobeAssetUrl,
   wardrobeItems,
-  type WardrobeItemId,
+  type WardrobeSelection,
   type WardrobeState,
 } from "@/lib/wardrobe/catalogue";
 import {
@@ -47,27 +50,34 @@ function WardrobePreview({ initial, sessionId, embedded }: {
 }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const renderer = useRef<MascotRenderer>(null);
-  const job = useRef<AbortController>(null);
+  const lifetime = useRef<AbortController>(null);
+  const refreshJob = useRef<AbortController>(null);
+  const preparing = useRef<AbortController>(null);
   const saving = useRef(false);
+  const accepted = useRef(initial);
+  const requested = useRef<WardrobeSelection>(null);
   const talkTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const rendered = useRef("");
   const [state, setState] = useState(initial);
   const [status, setStatus] = useState<MascotStatus>("loading");
   const [visibleItems, setVisibleItems] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [pending, setPending] = useState<WardrobeSelection | null>(null);
   const [message, setMessage] = useState("");
+  const [caption, setCaption] = useState("");
   const [preview, setPreview] = useState<"standalone" | "fitted">("standalone");
   const [angle, setAngle] = useState<MascotView>("front");
   const [size, setSize] = useState<"Desktop" | 51 | 56>("Desktop");
   const entitled = state.access !== "locked";
+  const selection = pending ?? state;
 
   useEffect(() => {
-    const signal = new AbortController();
+    const active = new AbortController();
+    lifetime.current = active;
     let controller: MascotRenderer | undefined;
     const refresh = async () => {
-      if (job.current || signal.signal.aborted) return;
+      if (saving.current || refreshJob.current || active.signal.aborted) return;
       const attempt = new AbortController();
-      job.current = attempt;
+      refreshJob.current = attempt;
       try {
         const next = await fetch(endpoint, { cache: "no-store", signal: attempt.signal })
           .then(response => response.ok ? response.json() as Promise<WardrobeState> : emptyWardrobe)
@@ -77,14 +87,18 @@ function WardrobePreview({ initial, sessionId, embedded }: {
           controller?.clearWardrobe();
           rendered.current = "";
           setVisibleItems("");
+          accepted.current = emptyWardrobe;
           setState(emptyWardrobe);
           return;
         }
+        accepted.current = next;
         setState(next);
-        const look = next.itemIds.join(",");
+        const visible = visibleWardrobeItems(next);
+        const look = visible.join(",");
         if (controller && look !== rendered.current) {
-          const prepared = await controller.prepareWardrobe(next.itemIds, attempt.signal);
+          const prepared = await controller.prepareWardrobe(visible, attempt.signal);
           try {
+            attempt.signal.throwIfAborted();
             prepared.commit();
             rendered.current = look;
             setVisibleItems(look);
@@ -95,17 +109,19 @@ function WardrobePreview({ initial, sessionId, embedded }: {
       } catch {
         if (!attempt.signal.aborted) setMessage("Ready’s wardrobe could not be loaded. Try again shortly.");
       } finally {
-        if (job.current === attempt) job.current = null;
+        if (refreshJob.current === attempt) refreshJob.current = null;
       }
     };
     void loadMascotRenderer().then(create => {
-      if (signal.signal.aborted || !canvas.current) return;
-      controller = create({ canvas: canvas.current, onStatus: setStatus, wardrobe: true });
+      if (active.signal.aborted || !canvas.current) return;
+      controller = create({
+        canvas: canvas.current, onStatus: setStatus, onWardrobeCaption: setCaption, wardrobe: true,
+      });
       renderer.current = controller;
       controller.setMode("floating");
       void refresh();
     }).catch(() => {
-      if (signal.signal.aborted) return;
+      if (active.signal.aborted) return;
       setStatus("error");
       void refresh();
     });
@@ -116,9 +132,12 @@ function WardrobePreview({ initial, sessionId, embedded }: {
     window.addEventListener("focus", recheck);
     document.addEventListener("visibilitychange", recheck);
     return () => {
-      signal.abort();
-      job.current?.abort();
-      job.current = null;
+      active.abort();
+      refreshJob.current?.abort();
+      refreshJob.current = null;
+      preparing.current?.abort();
+      preparing.current = null;
+      requested.current = null;
       saving.current = false;
       clearInterval(timer);
       clearTimeout(talkTimer.current);
@@ -130,53 +149,71 @@ function WardrobePreview({ initial, sessionId, embedded }: {
     };
   }, [sessionId]);
 
-  async function toggle(item: WardrobeItemId) {
-    if (!renderer.current || saving.current || !entitled || !sessionId || status !== "ready") return;
-    const ids = state.itemIds.includes(item)
-      ? state.itemIds.filter(id => id !== item)
-      : [...state.itemIds, item];
-    const next = parseWardrobeSelection(ids);
-    if (!next) return;
-    const attempt = new AbortController();
-    // An explicit outfit change takes priority over an in-flight background recheck.
-    job.current?.abort();
-    job.current = attempt;
+  async function updateSelection(change: (outfit: WardrobeSelection) => WardrobeSelection) {
+    const controller = renderer.current;
+    const active = lifetime.current;
+    if (!controller || !active || active.signal.aborted || accepted.current.access === "locked" ||
+      !sessionId || status !== "ready") return;
+    requested.current = change(requested.current ?? accepted.current);
+    setPending(requested.current);
+    refreshJob.current?.abort();
+    preparing.current?.abort();
+    if (saving.current) return;
     saving.current = true;
-    setBusy(true);
     setMessage("");
-    let prepared: Awaited<ReturnType<MascotRenderer["prepareWardrobe"]>> | undefined;
     try {
-      prepared = await renderer.current.prepareWardrobe(next, attempt.signal);
-      const response = await fetch(endpoint, {
-        method: "POST", signal: attempt.signal, cache: "no-store",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId, itemIds: next }),
-      });
-      if (response.status === 403) {
-        renderer.current.clearWardrobe();
-        rendered.current = "";
-        setVisibleItems("");
-        setState(emptyWardrobe);
-        setMessage("Wardrobe access has changed.");
-        return;
+      while (requested.current && !active.signal.aborted) {
+        const next: WardrobeSelection = requested.current;
+        const attempt = new AbortController();
+        preparing.current = attempt;
+        let prepared: Awaited<ReturnType<MascotRenderer["prepareWardrobe"]>> | undefined;
+        try {
+          const visible = visibleWardrobeItems(next);
+          prepared = await controller.prepareWardrobe(visible, attempt.signal);
+          attempt.signal.throwIfAborted();
+          if (requested.current !== next) continue;
+          preparing.current = null;
+          // Serialize saves. Aborting a request cannot undo a write already received by the server.
+          const response = await fetch(endpoint, {
+            method: "POST", cache: "no-store",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sessionId, itemIds: next.itemIds, dynamiteRestore: next.dynamiteRestore }),
+          });
+          if (active.signal.aborted) return;
+          if (response.status === 403) {
+            controller.clearWardrobe();
+            rendered.current = "";
+            accepted.current = emptyWardrobe;
+            requested.current = null;
+            setVisibleItems("");
+            setState(emptyWardrobe);
+            setMessage("Wardrobe access has changed.");
+            return;
+          }
+          if (!response.ok) throw new Error("Save failed.");
+          const saved = await response.json() as WardrobeState;
+          if (active.signal.aborted) return;
+          if (saved.sessionId !== sessionId || saved.access === "locked") throw new Error("Session changed.");
+          prepared.commit();
+          rendered.current = visible.join(",");
+          setVisibleItems(rendered.current);
+          accepted.current = saved;
+          setState(saved);
+          setMessage("Ready’s look was saved.");
+        } catch {
+          if (!active.signal.aborted && requested.current === next && !attempt.signal.aborted) {
+            setMessage("Could not update Ready’s look. Try again.");
+          }
+        } finally {
+          prepared?.discard();
+          if (preparing.current === attempt) preparing.current = null;
+          if (requested.current === next) requested.current = null;
+        }
       }
-      if (!response.ok) throw new Error("Save failed.");
-      const saved = await response.json() as WardrobeState;
-      attempt.signal.throwIfAborted();
-      if (saved.sessionId !== sessionId || saved.access === "locked") throw new Error("Session changed.");
-      prepared.commit();
-      rendered.current = saved.itemIds.join(",");
-      setVisibleItems(rendered.current);
-      setState(saved);
-      setMessage("Ready’s look was saved.");
-    } catch {
-      if (!attempt.signal.aborted) setMessage("Could not update Ready’s look. Try again.");
     } finally {
-      prepared?.discard();
-      if (job.current === attempt) {
-        job.current = null;
+      if (!active.signal.aborted) {
         saving.current = false;
-        setBusy(false);
+        setPending(null);
       }
     }
   }
@@ -234,6 +271,18 @@ function WardrobePreview({ initial, sessionId, embedded }: {
             <button key={style} className={control} disabled={status !== "ready"} onClick={() => talk(style)}>{label} speech</button>
           ))}
         </div>
+        {visibleItems.includes("eyewear_protruding_eyes") && (
+          <div className="mt-3">
+            <button className={control} onClick={() => renderer.current?.commandWardrobe("play-gaze-cues")}>Play gaze cues</button>
+            <p className="mt-2 min-h-6 text-sm text-zinc-300" role="status">{caption}</p>
+          </div>
+        )}
+        {visibleItems.includes("headwear_flip_up_welding_mask") && (
+          <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Welding visor">
+            <button className={control} onClick={() => renderer.current?.commandWardrobe("lower-visor")}>Lower visor</button>
+            <button className={control} onClick={() => renderer.current?.commandWardrobe("raise-visor")}>Raise visor</button>
+          </div>
+        )}
       </section>
       <section className={embedded ? "@container min-w-0" : "min-w-0"} aria-label="Ready items">
         <p className="mb-3 text-sm text-zinc-300">
@@ -246,23 +295,40 @@ function WardrobePreview({ initial, sessionId, embedded }: {
           <button className={control + " " + selected} aria-pressed={preview === "standalone"} onClick={() => setPreview("standalone")}>Standalone</button>
           <button className={control + " " + selected} aria-pressed={preview === "fitted"} onClick={() => setPreview("fitted")}>Fitted on Ready</button>
         </div>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2">
+          <div>
+            <p className="font-semibold text-zinc-100">Dynamite Set</p>
+            <p className="text-sm text-zinc-400">Dynamite Helmet Band and Sparking Dynamite Stick</p>
+          </div>
+          {entitled
+            ? <button className={control} disabled={status !== "ready"}
+                onClick={() => void updateSelection(toggleDynamiteSet)}>
+                {selection.dynamiteRestore ? "Remove Dynamite Set" : "Equip Dynamite Set"}
+              </button>
+            : <span className="text-sm text-zinc-400">Locked</span>}
+        </div>
+        <p className="mb-3 min-h-6 text-sm text-zinc-300" role="status">{pending ? "Updating Ready’s look…" : message}</p>
         <ul className={embedded
           ? "grid gap-3 @min-[22rem]:grid-cols-2 @min-[35rem]:grid-cols-3"
           : "grid gap-3 sm:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3"}>
           {wardrobeItems.map(item => {
-            const equipped = state.itemIds.includes(item.id);
+            const equipped = selection.itemIds.includes(item.id);
+            const constraint = itemConstraint(item.id, selection.itemIds);
             const file = preview + (entitled ? ".webp" : "-blur.webp");
             return (
               <li key={item.id} className="flex min-w-0 flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950">
                 {/* The server mediates all sharp bytes. The public variants are separately rendered WebPs. */}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img className="aspect-square w-full bg-zinc-900 object-contain" src={wardrobeAssetUrl(item.id, file)}
-                  width={512} height={512} alt={`${item.name} ${preview} ${entitled ? "preview" : "blurred preview"}`} />
+                  width={512} height={512} loading="lazy" decoding="async"
+                  alt={`${item.name} ${preview} ${entitled ? "preview" : "blurred preview"}`} />
                 <div className="flex grow flex-col items-start gap-3 p-3">
                   <ItemHeading className="text-base font-semibold text-zinc-100">{item.name}</ItemHeading>
+                  {entitled && constraint && <span className="text-xs text-zinc-400">{constraint}</span>}
                   {entitled ? (
-                    <button className={control + " mt-auto"} disabled={busy || status !== "ready"}
-                      aria-label={`${equipped ? "Remove" : "Equip"} ${item.name}`} onClick={() => void toggle(item.id)}>
+                    <button className={control + " mt-auto"} disabled={status !== "ready"}
+                      aria-label={`${equipped ? "Remove" : "Equip"} ${item.name}`}
+                      onClick={() => void updateSelection(outfit => toggleWardrobeItem(outfit, item.id))}>
                       {equipped ? "Remove" : "Equip"}
                     </button>
                   ) : <span className="mt-auto text-sm text-zinc-400">Locked</span>}
@@ -271,7 +337,6 @@ function WardrobePreview({ initial, sessionId, embedded }: {
             );
           })}
         </ul>
-        <p className="mt-3 min-h-6 text-sm text-zinc-300" role="status">{busy ? "Updating Ready’s look…" : message}</p>
       </section>
     </div>
   );
