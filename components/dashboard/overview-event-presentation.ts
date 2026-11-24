@@ -138,7 +138,9 @@ export function buildDashboardOverviewEvent({
       deadline: offer ? registration.waitlist_offer_expires_at : event && registrationWindowOpen(event, now) &&
         futureDeadline(event.registrationCloseAt, now) !== Infinity ? event.registrationCloseAt : null,
       deadlineLabel: offer ? "Offer expires" : "Registration closes",
-      action: { kind: "link", label: offer ? "Review available place" : "View registration", href: `#registration-${registration.id}` },
+      action: !offer && event
+        ? { kind: "link", label: "View tournament", href: eventHref(event) }
+        : { kind: "link", label: offer ? "Review available place" : "View registration", href: `#registration-${registration.id}` },
     };
   }
 

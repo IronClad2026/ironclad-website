@@ -51,10 +51,10 @@ describe("Dashboard next tournament action", () => {
     }
   });
 
-  it("links an existing registration to its actual disclosure before suggesting a new entry", () => {
+  it("opens the registered tournament without starting a new entry", () => {
     const model = select({ registrations: [registration] });
     expect(model?.kind).toBe("registration");
-    expect(model?.action).toEqual({ kind: "link", label: "View registration", href: "#registration-registration" });
+    expect(model?.action).toEqual({ kind: "link", label: "View tournament", href: "/tournaments?tournament=hold-the-line" });
     expect(model?.deadline).toBe(later);
     expect(model?.deadlineLabel).toBe("Registration closes");
   });
@@ -62,7 +62,13 @@ describe("Dashboard next tournament action", () => {
   it("uses the recorded unexpired waitlist deadline without turning an expired offer into an active offer", () => {
     const offer = { ...registration, registration_status: "waitlisted" as const, waitlist_offer_status: "offered" as const, waitlist_offer_expires_at: later };
     expect(select({ registrations: [offer] })?.deadline).toBe(later);
+    expect(select({ registrations: [offer] })?.action).toEqual({ kind: "link", label: "Review available place", href: "#registration-registration" });
     expect(select({ registrations: [{ ...offer, waitlist_offer_expires_at: "2026-11-23T00:00:00Z" }] })?.deadlineLabel).toBe("Registration closes");
+  });
+
+  it("keeps the registration reachable if the live tournament cannot be resolved", () => {
+    const model = select({ events: [], registrations: [{ ...registration, tournament_status: "in_progress" }] });
+    expect(model?.action).toEqual({ kind: "link", label: "View registration", href: "#registration-registration" });
   });
 
   it("describes accepted waitlist review only while pending or in manual review", () => {
