@@ -101,6 +101,7 @@ it("filters the catalogue without remounting the preview and keeps hidden saved 
   vi.stubGlobal("fetch", request);
   mocks.prepare.mockResolvedValue({ commit: mocks.commit, discard: vi.fn() });
   render(<WardrobePilot initial={outfit} />);
+  expect(screen.queryByRole("button", { name: "Browse items" })).not.toBeInTheDocument();
 
   const canvas = await screen.findByRole("img", { name: "Ready 3D preview" });
   await waitFor(() => expect(mocks.commit).toHaveBeenCalledOnce());
@@ -121,4 +122,47 @@ it("filters the catalogue without remounting the preview and keeps hidden saved 
   remove.focus();
   fireEvent.click(remove);
   await waitFor(() => expect(screen.getByRole("button", { name: "Equipped (1)" })).toHaveFocus());
+});
+
+it("starts the dashboard preview without item rows and preserves the catalogue across hide and show", async () => {
+  const outfit: WardrobeState = { ...initial, itemIds: ["eyewear_smoked_aviators"] };
+  const request = vi.fn(() => Promise.resolve(Response.json(outfit)));
+  vi.stubGlobal("fetch", request);
+  mocks.prepare.mockResolvedValue({ commit: mocks.commit, discard: vi.fn() });
+  render(<WardrobePilot initial={outfit} embedded />);
+
+  const canvas = await screen.findByRole("img", { name: "Ready 3D preview" });
+  await waitFor(() => expect(mocks.commit).toHaveBeenCalledOnce());
+  const browse = screen.getByRole("button", { name: "Browse items" });
+  const scrollToggle = vi.fn();
+  Object.defineProperty(browse, "scrollIntoView", { value: scrollToggle });
+  const panel = document.getElementById(browse.getAttribute("aria-controls") ?? "");
+  expect(panel).not.toBeVisible();
+  expect(panel).toBeEmptyDOMElement();
+  expect(browse).toHaveAttribute("aria-expanded", "false");
+
+  fireEvent.click(browse);
+  expect(browse).toHaveAccessibleName("Hide items");
+  expect(browse.closest("section")?.nextElementSibling).toBe(panel);
+  expect(browse.closest("section")).toContainElement(canvas);
+  expect(panel).toBeVisible();
+  fireEvent.change(screen.getByRole("combobox", { name: "Category" }), { target: { value: "Helmet accessories" } });
+  expect(screen.getByRole("button", { name: "Equip Tanker’s Crown" })).toBeVisible();
+
+  fireEvent.click(browse);
+  expect(panel).not.toBeVisible();
+  expect(screen.queryByRole("button", { name: "Equip Tanker’s Crown" })).not.toBeInTheDocument();
+  await waitFor(() => expect(scrollToggle).toHaveBeenCalledWith({ block: "nearest", inline: "nearest" }));
+  fireEvent.click(browse);
+  expect(screen.getByRole("combobox", { name: "Category" })).toHaveValue("Helmet accessories");
+
+  fireEvent.click(screen.getByRole("button", { name: "Equipped (1)" }));
+  const remove = screen.getByRole("button", { name: "Remove Smoked Aviators" });
+  fireEvent.click(browse);
+  fireEvent.click(browse);
+  expect(screen.getByRole("button", { name: "Equipped (1)" })).toHaveAttribute("aria-pressed", "true");
+  expect(screen.getByRole("button", { name: "Remove Smoked Aviators" })).toBe(remove);
+  expect(screen.getByRole("img", { name: "Ready 3D preview" })).toBe(canvas);
+  expect(mocks.prepare).toHaveBeenCalledOnce();
+  expect(request).toHaveBeenCalledOnce();
 });

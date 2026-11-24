@@ -1,5 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
-import { MapPin } from "lucide-react";
+import { ArrowUpRight, MapPin } from "lucide-react";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import DashboardNotifications from "@/components/DashboardNotifications";
 import DashboardBadgesSection from "@/components/badges/DashboardBadgesSection";
@@ -31,6 +32,8 @@ import DashboardRegistrationNavigation from "@/components/dashboard/DashboardReg
 import DashboardPerformance from "@/components/dashboard/DashboardPerformance";
 import { EmptyRegistrations, RegistrationCard } from "@/components/dashboard/DashboardRegistrations";
 import { groupDashboardRegistrations, type PlayerRegistration } from "@/components/dashboard/registration-presentation";
+import { getCompetitionPriority, type CompetitionSection } from "@/components/dashboard/competition-presentation";
+import styles from "./Dashboard.module.css";
 
 export const dynamic = "force-dynamic";
 
@@ -140,19 +143,58 @@ export default async function PlayerDashboardPage() {
 
   const { current: currentRegistrations } =
     groupDashboardRegistrations(registrations);
+  const priority = getCompetitionPriority(
+    career.error ? [] : career.notifications,
+    currentRegistrations,
+    divisionInvitationState.invitations,
+  );
+  const sections: CompetitionSection[] = ["matches", "registrations", "invitations"];
+  const competitionOrder = priority
+    ? [priority.section, ...sections.filter(section => section !== priority.section)]
+    : sections;
+  const visibleRegistrations = priority?.registrationId
+    ? [...currentRegistrations].sort((left, right) =>
+      Number(right.id === priority.registrationId) - Number(left.id === priority.registrationId))
+    : currentRegistrations;
+  const competition = {
+    matches: <DashboardNotifications
+      key={[locale, ...career.notifications.map(notification => `${notification.id}:${notification.status}`)].join("|")}
+      presentation="competition"
+      notifications={career.notifications}
+      error={career.error ? t(career.error === "load-failed"
+        ? "dashboard.career.loadError" : "dashboard.career.partialError") : null}
+    />,
+    registrations: <section data-dashboard-section="registrations" aria-labelledby="dashboard-registrations-title">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 id="dashboard-registrations-title" className="text-base font-bold text-zinc-200">
+          {t("dashboard.competition.registrations")}
+        </h3>
+        {!registrationsResult.error && <p className="text-xs text-zinc-400">
+          {formatDashboardRegistrationCount(currentRegistrations.length, locale, t)}
+        </p>}
+      </div>
+      {registrationsResult.error ? (
+        <div className="mt-2"><DashboardError message={t("dashboard.registrations.loadError")} /></div>
+      ) : visibleRegistrations.length === 0 ? (
+        <EmptyRegistrations t={t} />
+      ) : (
+        <div className="mt-2 grid gap-2">
+          {visibleRegistrations.map(registration => (
+            <RegistrationCard key={registration.id} registration={registration} locale={locale} t={t} />
+          ))}
+        </div>
+      )}
+    </section>,
+    invitations: <PlayerDivisionInvitations
+      invitations={divisionInvitationState.invitations}
+      loadError={divisionInvitationState.status === "error"}
+    />,
+  };
 
   return (
     <main
-      className="min-h-screen bg-black bg-cover bg-center bg-fixed px-4 pb-16 pt-24 text-white sm:px-6 sm:pt-28 lg:pb-20 lg:pt-28"
+      className={`${styles.dashboard} min-h-screen px-3 pb-16 pt-24 text-white sm:px-6 sm:pt-28 lg:pb-20`}
       data-dashboard-command-centre
-      style={{
-        backgroundImage:
-          "linear-gradient(180deg,rgba(0,0,0,0.9),rgba(0,0,0,0.76) 44%,rgba(0,0,0,0.94)),linear-gradient(110deg,rgba(0,0,0,0.94),rgba(0,0,0,0.62),rgba(249,115,22,0.12),rgba(0,0,0,0.92)),url('/images/sfondi/7.jpg')",
-        backgroundAttachment: "fixed",
-        backgroundPosition: "center",
-        backgroundRepeat: "no-repeat",
-        backgroundSize: "cover",
-      }}
     >
       <div className="relative z-10 mx-auto max-w-7xl">
         <DashboardRegistrationNavigation key={currentRegistrations.map((registration) => registration.id).join("|")} />
@@ -165,59 +207,27 @@ export default async function PlayerDashboardPage() {
           wardrobeEnabled={isReadyWardrobePilotEnabled()}
         />
 
-        <div className="mt-6 grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(280px,0.48fr)]" data-dashboard-section="current-actions">
+        <div className="mt-4 grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(17rem,0.46fr)] lg:gap-6" data-dashboard-section="current-actions">
           <section className="min-w-0" aria-labelledby="dashboard-competition-title">
-            <div className="mb-4">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-x-3">
               <h2 id="dashboard-competition-title" className="text-xl font-black tracking-tight text-white sm:text-2xl">
                 {t("dashboard.competition.title")}
               </h2>
+              {(currentRegistrations.length > 0 || registrationsResult.error) && <Link
+                href="/tournaments"
+                className="inline-flex min-h-11 items-center gap-1.5 rounded-sm px-1 text-sm font-semibold text-orange-200 hover:text-orange-100 focus-visible:outline-2 focus-visible:outline-orange-300"
+              >
+                {t("dashboard.profile.goTournaments")} <ArrowUpRight size={15} aria-hidden="true" />
+              </Link>}
             </div>
-            <DashboardNotifications
-              key={[
-                locale,
-                ...career.notifications.map(
-                  (notification) => `${notification.id}:${notification.status}`
-                ),
-              ].join("|")}
-              presentation="competition"
-              notifications={career.notifications}
-              error={
-                career.error
-                  ? t(
-                      career.error === "load-failed"
-                        ? "dashboard.career.loadError"
-                        : "dashboard.career.partialError"
-                    )
-                  : null
-              }
-            />
-            <section className="mt-5" data-dashboard-section="registrations" aria-labelledby="dashboard-registrations-title">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 id="dashboard-registrations-title" className="text-base font-bold text-zinc-200">
-                  {t("dashboard.competition.registrations")}
-                </h3>
-                {!registrationsResult.error && (
-                  <p className="text-xs text-zinc-400">
-                    {formatDashboardRegistrationCount(currentRegistrations.length, locale, t)}
-                  </p>
-                )}
-              </div>
-              {registrationsResult.error ? (
-                <div className="mt-3"><DashboardError message={t("dashboard.registrations.loadError")} /></div>
-              ) : currentRegistrations.length === 0 ? (
-                <EmptyRegistrations t={t} />
-              ) : (
-                <div className="mt-3 grid gap-3">
-                  {currentRegistrations.map((registration) => (
-                    <RegistrationCard key={registration.id} registration={registration} locale={locale} t={t} />
-                  ))}
+            <div className="grid gap-3">
+              {competitionOrder.map(section => (
+                <div key={section} data-competition-group={section}
+                  className={priority?.section === section ? styles.priority : undefined}>
+                  {competition[section]}
                 </div>
-              )}
-            </section>
-            <PlayerDivisionInvitations
-              invitations={divisionInvitationState.invitations}
-              loadError={divisionInvitationState.status === "error"}
-            />
+              ))}
+            </div>
           </section>
           <aside id="player-notifications" className="min-w-0 scroll-mt-28" aria-label={t("dashboard.competition.updates")}>
             <InAppNotificationCenter
@@ -243,67 +253,51 @@ export default async function PlayerDashboardPage() {
           </aside>
         </div>
 
-        {!career.error && (
-          <DashboardPerformance
-            statistics={career.statistics}
-            locale={locale}
-            t={t}
-          />
-        )}
-
-        <DashboardBadgesSection
-          badgeData={
-            badgeRevealState.status === "success"
-              ? badgeRevealState.badgeData
-              : null
-          }
-          pendingReveals={
-            badgeRevealState.status === "success"
-              ? badgeRevealState.pendingReveals
-              : []
-          }
-          acknowledgeRevealAction={acknowledgeBadgeReveal}
-          loadError={badgeLoadError}
-          revealLoadError={badgeRevealLoadError}
-          dictionary={dictionaries.badges}
-          locale={locale}
-        />
-
-        <DashboardCareerHistory
-          matches={career.matchHistory}
-          champions={career.champions}
-          loadError={career.error ? t(
-            career.error === "load-failed"
-              ? "dashboard.career.loadError"
-              : "dashboard.career.partialError"
-          ) : null}
-        />
         <div
-          id="community-polls"
-          className="mt-8 scroll-mt-28"
-          data-dashboard-section="community"
+          className="mt-5 grid items-start gap-5 border-t border-white/15 pt-4 lg:grid-cols-[minmax(0,1fr)_minmax(17rem,0.46fr)] lg:gap-6"
         >
-          <PollsAndDecisions
-            surface="community"
-            density="compact"
-            initialPolls={communityPolls.polls}
-            initialError={communityPolls.error}
-          />
-        </div>
+          <div className="min-w-0">
+            {!career.error && <DashboardPerformance statistics={career.statistics} locale={locale} t={t} />}
+            <DashboardCareerHistory
+              matches={career.matchHistory}
+              champions={career.champions}
+              loadError={career.error ? t(career.error === "load-failed"
+                ? "dashboard.career.loadError" : "dashboard.career.partialError") : null}
+            />
+          </div>
+          <div className="min-w-0 [&>section:first-child]:mt-0">
+            <DashboardBadgesSection
+              badgeData={badgeRevealState.status === "success" ? badgeRevealState.badgeData : null}
+              pendingReveals={badgeRevealState.status === "success" ? badgeRevealState.pendingReveals : []}
+              acknowledgeRevealAction={acknowledgeBadgeReveal}
+              loadError={badgeLoadError}
+              revealLoadError={badgeRevealLoadError}
+              dictionary={dictionaries.badges}
+              locale={locale}
+            />
 
-        {profile && (
-          <section className="mt-8" aria-labelledby="dashboard-visibility-title" data-dashboard-section="profile-visibility">
-            <h2 id="dashboard-visibility-title" className="text-xl font-bold text-white sm:text-2xl">
-              {t("dashboard.utilities.title")}
-            </h2>
-            <div className="mt-4 grid gap-3 md:grid-cols-2">
-              <DiscordContactVisibilityCard
-                initialEnabled={Boolean(profile.discord_public_enabled)}
-                hasDiscordUsername={Boolean(profile.discord_username?.trim())}
+            <div id="community-polls" className="mt-4 scroll-mt-28" data-dashboard-section="community">
+              <PollsAndDecisions
+                surface="community"
+                density="compact"
+                initialPolls={communityPolls.polls}
+                initialError={communityPolls.error}
               />
             </div>
-          </section>
-        )}
+
+            {profile && <section className="mt-4" aria-labelledby="dashboard-visibility-title" data-dashboard-section="profile-visibility">
+              <h2 id="dashboard-visibility-title" className="text-xl font-bold text-white">
+                {t("dashboard.utilities.title")}
+              </h2>
+              <div className="mt-2">
+                <DiscordContactVisibilityCard
+                  initialEnabled={Boolean(profile.discord_public_enabled)}
+                  hasDiscordUsername={Boolean(profile.discord_username?.trim())}
+                />
+              </div>
+            </section>}
+          </div>
+        </div>
       </div>
     </main>
   );

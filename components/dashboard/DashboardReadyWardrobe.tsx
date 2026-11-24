@@ -65,7 +65,7 @@ export default function DashboardReadyWardrobe() {
       tabIndex={-1}
       aria-labelledby={headingId}
       data-wardrobe-expanded={open ? "true" : undefined}
-      className="col-span-full my-3 min-w-0 scroll-mt-28 rounded-xl border border-white/15 bg-zinc-950/85 px-3 py-2.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300 sm:scroll-mt-32"
+      className="col-span-full my-1 min-w-0 scroll-mt-28 rounded-lg border border-white/15 bg-zinc-950/85 px-2.5 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300 sm:scroll-mt-32"
     >
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <div className="mr-auto flex min-w-0 items-center gap-2">

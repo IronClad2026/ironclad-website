@@ -33,7 +33,7 @@ export default function PlayerDivisionInvitations({
   return (
     <section
       id="division-invitations"
-      className="mt-5 min-w-0 scroll-mt-28"
+      className="min-w-0 scroll-mt-28"
       data-dashboard-section="division-invitations"
       aria-labelledby="division-invitations-title"
     >

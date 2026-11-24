@@ -44,6 +44,7 @@ import { formatNumber, selectPlural } from "@/lib/i18n/format";
 import { localizeBracketRoundName } from "@/lib/i18n/round-display";
 import type { MessageValues } from "@/lib/i18n/types";
 import type { DashboardNotification } from "@/lib/player-dashboard";
+import { compareMatchAttention, requiresMatchAttention } from "@/components/dashboard/competition-presentation";
 
 type NotificationTranslator = (
   path: string,
@@ -82,7 +83,7 @@ export default function DashboardNotifications({
   });
   const actionRequired = notifications.filter(requiresMatchAttention).length;
   const displayedNotifications = presentation === "competition"
-    ? [...notifications].sort((left, right) => Number(requiresMatchAttention(right)) - Number(requiresMatchAttention(left)))
+    ? [...notifications].sort((left, right) => compareMatchAttention(left, right, now ?? 0))
     : notifications;
   const allSelected =
     notifications.length > 0 && selectedIds.size === notifications.length;
@@ -373,11 +374,6 @@ export default function DashboardNotifications({
       </AnimatePresence>
     </section>
   );
-}
-
-function requiresMatchAttention(notification: DashboardNotification) {
-  return notification.canConfirm || notification.canDispute ||
-    notification.status === "rejected" || notification.status === "resubmission_requested";
 }
 
 function NotificationRow({

@@ -65,7 +65,9 @@ describe("the dashboard wardrobe", () => {
   it("keeps the poster under the display name and loads the workspace only after opening", async () => {
     const view = render(identity(true));
     const region = screen.getByRole("region", { name: "Ready Wardrobe" });
-    expect(screen.getByRole("heading", { name: profile.display_name }).nextElementSibling).toBe(region);
+    const nameBlock = screen.getByRole("heading", { name: profile.display_name }).parentElement;
+    expect(nameBlock?.nextElementSibling).toBe(region);
+    expect(region).toHaveClass("col-span-full");
     expect(region.querySelector("img")).toHaveAttribute("src", expect.stringContaining("data:image/"));
     expect(screen.getByRole("button", { name: "Open wardrobe" })).toHaveAttribute("aria-expanded", "false");
     expect(region).not.toHaveAttribute("data-wardrobe-expanded");

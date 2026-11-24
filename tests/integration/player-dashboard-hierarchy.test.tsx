@@ -72,6 +72,7 @@ vi.mock("@/lib/supabase-server", () => ({
 }));
 
 import PlayerDashboardPage from "@/app/dashboard/page";
+import { getCompetitionPriority } from "@/components/dashboard/competition-presentation";
 
 describe("Player Dashboard information hierarchy", () => {
   afterEach(cleanup);
@@ -121,7 +122,7 @@ describe("Player Dashboard information hierarchy", () => {
       "main[data-dashboard-command-centre]"
     );
     expect(commandCentre).not.toBeNull();
-    expect(commandCentre).toHaveClass("px-4", "pt-24", "sm:px-6");
+    expect(commandCentre).toHaveClass("px-3", "pt-24", "sm:px-6");
 
     const orderedSections = [
       "header",
@@ -229,6 +230,26 @@ describe("Player Dashboard information hierarchy", () => {
     await expect(PlayerDashboardPage()).rejects.toThrow("NEXT_REDIRECT");
     expect(createAuthenticatedSupabaseClientMock).not.toHaveBeenCalled();
     expect(loadPlayerCareerDashboardMock).not.toHaveBeenCalled();
+  });
+
+  it("prioritizes the nearest available response and leaves the regular order when no response is due", () => {
+    const now = Date.parse("2026-11-24T07:00:00Z");
+    const match = {
+      canConfirm: true, canDispute: true, status: "pending_confirmation" as const,
+      confirmationDeadlineAt: "2026-11-24T08:00:00Z",
+    };
+    const offer = {
+      id: "next-seat", launched_at: null, waitlist_offer_status: "offered" as const,
+      waitlist_offer_expires_at: "2026-11-24T07:30:00Z",
+    };
+    const expired = { ...offer, id: "expired-seat", waitlist_offer_expires_at: "2026-11-24T06:30:00Z" };
+    expect(getCompetitionPriority([match], [expired, offer], [], now))
+      .toEqual({ section: "registrations", registrationId: offer.id });
+    expect(getCompetitionPriority([match], [expired], [{ status: "pending" }], now))
+      .toEqual({ section: "matches" });
+    expect(getCompetitionPriority([], [expired], [{ status: "pending" }], now))
+      .toEqual({ section: "invitations" });
+    expect(getCompetitionPriority([], [expired], [{ status: "declined" }], now)).toBeNull();
   });
 });
 

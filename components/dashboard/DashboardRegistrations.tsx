@@ -28,7 +28,7 @@ export function RegistrationCard({
       data-registration-presentation="current"
       className="min-w-0 scroll-mt-28 border border-white/12 border-t-orange-400/50 bg-zinc-950/85 transition-colors focus-within:border-white/25 target:border-orange-400/70"
     >
-      <div className="px-4 py-3.5 sm:px-5">
+      <div className="px-3 pt-3 pb-2 sm:px-4">
         <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
           <div className="min-w-0 flex-1 basis-48">
             <h3 className="break-words text-base font-bold leading-6 text-white sm:text-lg">
@@ -42,10 +42,10 @@ export function RegistrationCard({
           <StatusBadge status={registration.registration_status} t={t} />
         </div>
       </div>
-      <div className="border-y border-white/8 bg-white/[0.025] px-4 py-2.5 sm:px-5">
+      <div className="border-y border-white/8 px-3 py-2 sm:px-4">
         <RegistrationMetadata registration={registration} locale={locale} t={t} />
       </div>
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-3 px-4 py-3 sm:px-5">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-3 py-2.5 sm:px-4">
         <RegistrationContext registration={registration} t={t} />
         <RegistrationActions registration={registration} />
       </div>
@@ -285,7 +285,7 @@ function RegistrationValue({
 
 export function EmptyRegistrations({ t }: { t: DashboardTranslator }) {
   return (
-    <div className="mt-3 flex flex-wrap items-center justify-between gap-4 border border-dashed border-white/15 bg-zinc-950/50 p-4 sm:px-5">
+    <div className="mt-2 flex flex-wrap items-center justify-between gap-3 border border-dashed border-white/15 bg-zinc-950/50 p-3 sm:px-4">
       <div className="min-w-0 flex-1 basis-64">
         <h3 className="text-base font-bold text-white">
           {t("dashboard.competition.emptyCurrentTitle")}

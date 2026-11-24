@@ -22,14 +22,14 @@ export default function DashboardPerformance({
   ];
 
   return (
-    <section id="dashboard-statistics" className="mt-8 scroll-mt-28" aria-labelledby="dashboard-performance-title" data-dashboard-section="statistics">
+    <section id="dashboard-statistics" className="scroll-mt-28" aria-labelledby="dashboard-performance-title" data-dashboard-section="statistics">
       <h2 id="dashboard-performance-title" className="text-xl font-bold text-white sm:text-2xl">
         {t("dashboard.statistics.title")}
       </h2>
-      <dl className="mt-4 grid grid-cols-2 gap-px overflow-hidden border border-white/12 bg-white/10 sm:grid-cols-3 xl:grid-cols-6">
+      <dl className="mt-2 grid grid-cols-3 gap-px overflow-hidden border border-white/12 bg-white/10">
         {values.map(({ key, value }) => (
-          <div key={key} className="flex min-w-0 flex-col-reverse justify-end gap-2 bg-zinc-950 px-4 py-5 sm:px-5">
-            <dt className="text-xs leading-5 text-zinc-400">{t(`dashboard.statistics.${key}`)}</dt>
+          <div key={key} className="flex min-w-0 flex-col-reverse justify-end gap-1 bg-zinc-950 px-2.5 py-2.5 sm:px-3">
+            <dt className="break-words text-xs leading-4 text-zinc-400">{t(`dashboard.statistics.${key}`)}</dt>
             <dd className={`text-2xl font-bold tabular-nums sm:text-3xl ${key === "winRate" || key === "tournamentsWon" ? "text-orange-300" : "text-white"}`}>{value}</dd>
           </div>
         ))}

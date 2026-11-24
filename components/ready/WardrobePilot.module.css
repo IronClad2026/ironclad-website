@@ -110,6 +110,39 @@
   padding-block-end: 5.5rem;
 }
 
+.studioTools {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.35rem;
+  margin-block-start: 0.45rem;
+}
+
+.studioTools:has(.options[open]) { flex-wrap: wrap; }
+.studioTools .options { min-width: 0; margin: 0; }
+.studioTools .options[open] { flex-basis: 100%; }
+.studioTools .optionsBody {
+  max-height: max(3rem, calc(100svh - var(--preview-top) - 13rem));
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.studioTools .options > summary,
+.browseToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding-inline: 0.45rem;
+  font-size: 0.8125rem;
+  white-space: nowrap;
+}
+
+.studioTools .options > summary { white-space: normal; }
+.studioTools svg { flex: none; }
+
+@container wardrobe (width < 17rem) {
+  .studioTools .options > summary svg { display: none; }
+}
+
 .toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -354,3 +387,27 @@
   .feedback { min-height: 1.2em; }
   .row button { scroll-margin-block-start: var(--preview-top); }
 }
+
+.workspace[data-browse-open],
+.workspace[data-browse-open]:has(.studio[data-larger="true"]) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.workspace[data-browse-open="false"] .studio { max-width: 34rem; }
+
+.workspace[data-browse-open] .studio {
+  position: sticky;
+  top: var(--preview-top);
+}
+
+.workspace[data-browse-open] .studio .previewSummary {
+  grid-template-columns: 5.25rem minmax(0, 1fr);
+  grid-template-areas: "model heading" "model controls" "model feedback";
+  row-gap: 0.2rem;
+}
+
+.workspace[data-browse-open] .studio[data-larger="true"] .previewSummary {
+  grid-template-columns: clamp(6rem, 18vw, 10rem) minmax(0, 1fr);
+}
+
+.workspace[data-browse-open] .studio[data-larger="true"] .model { width: 100%; }

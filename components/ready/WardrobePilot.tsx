@@ -2,7 +2,7 @@
 
 import { useAuth } from "@clerk/nextjs";
 import Link from "next/link";
-import { Expand, ImageIcon, LockKeyhole, Minus, Plus, SlidersHorizontal, X } from "lucide-react";
+import { Expand, ImageIcon, LockKeyhole, Menu, Minus, Plus, SlidersHorizontal, X } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { READY_DOCK_POSTER_DATA } from "@/lib/ready/poster-data";
 import {
@@ -101,6 +101,7 @@ function WardrobePreview({ initial, sessionId, embedded }: {
   const [pending, setPending] = useState<WardrobeSelection | null>(null);
   const [message, setMessage] = useState("");
   const [caption, setCaption] = useState("");
+  const [browse, setBrowse] = useState<"unopened" | "visible" | "hidden">("unopened");
   const [tab, setTab] = useState<"browse" | "equipped">("browse");
   const [category, setCategory] = useState("");
   const [artwork, setArtwork] = useState<(typeof wardrobeItems)[number] | null>(null);
@@ -109,9 +110,12 @@ function WardrobePreview({ initial, sessionId, embedded }: {
   const [larger, setLarger] = useState(false);
   const artworkDialog = useRef<HTMLDialogElement>(null);
   const artworkTrigger = useRef<HTMLButtonElement>(null);
+  const browseToggle = useRef<HTMLButtonElement>(null);
   const equippedTab = useRef<HTMLButtonElement>(null);
   const removeTrigger = useRef<HTMLButtonElement>(null);
   const uid = useId();
+  const catalogueId = uid + "-catalogue";
+  const catalogueVisible = !embedded || browse === "visible";
   const [angle, setAngle] = useState<MascotView>("front");
   const [size, setSize] = useState<"Desktop" | 51 | 56>("Desktop");
   const entitled = state.access !== "locked";
@@ -127,6 +131,14 @@ function WardrobePreview({ initial, sessionId, embedded }: {
   useEffect(() => {
     if (artwork) artworkDialog.current?.showModal();
   }, [artwork]);
+
+  useEffect(() => {
+    if (browse !== "hidden") return;
+    const frame = window.requestAnimationFrame(() => {
+      browseToggle.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [browse]);
 
   useEffect(() => {
     if (pending || !removeTrigger.current) return;
@@ -305,7 +317,8 @@ function WardrobePreview({ initial, sessionId, embedded }: {
   const ItemHeading = embedded ? "h5" : "h3";
   const workspace = (
     <div className={styles.container}>
-      <div className={styles.workspace} data-ready-wardrobe-workspace="">
+      <div className={styles.workspace} data-ready-wardrobe-workspace=""
+        data-browse-open={embedded ? catalogueVisible : undefined}>
       <section className={styles.studio} data-larger={larger} aria-labelledby={uid + "-preview"}>
         <div className={styles.previewSummary}>
           <PreviewHeading id={uid + "-preview"} className={styles.previewHeading}>Ready preview</PreviewHeading>
@@ -334,13 +347,21 @@ function WardrobePreview({ initial, sessionId, embedded }: {
               status === "error" ? "Live preview unavailable. Item artwork is still available." : "")}
           </p>
         </div>
+        <div className={embedded ? styles.studioTools : "contents"}>
+          {embedded && (
+            <button type="button" ref={browseToggle} className={`${control} ${styles.browseToggle}`}
+              aria-controls={catalogueId} aria-expanded={catalogueVisible}
+              onClick={() => setBrowse(value => value === "visible" ? "hidden" : "visible")}>
+              <Menu size={16} aria-hidden="true" /> {catalogueVisible ? "Hide items" : "Browse items"}
+            </button>
+          )}
         <details className={styles.options} onToggle={event => {
           if (!event.currentTarget.open) return;
-          const preview = event.currentTarget.parentElement;
+          const preview = event.currentTarget.closest("section");
           if (preview && preview.getBoundingClientRect().top < 0) preview.scrollIntoView({ block: "start" });
         }}>
           <summary className={control}><SlidersHorizontal aria-hidden="true" size={16} /> Preview options</summary>
-          <div className={styles.optionsBody}>
+          <div className={styles.optionsBody} data-lenis-prevent={embedded ? "" : undefined}>
         <div className="flex flex-wrap gap-2" aria-label="Preview angle" role="group">
           <button className={control + " " + selected} aria-pressed={angle === "front"} onClick={() => setView("front")}>Front</button>
           <button className={control + " " + selected} aria-pressed={angle === "three-quarter"} onClick={() => setView("three-quarter")}>Three-quarter</button>
@@ -372,8 +393,10 @@ function WardrobePreview({ initial, sessionId, embedded }: {
         )}
           </div>
         </details>
+        </div>
       </section>
-      <section className={styles.catalogue} aria-label="Ready items">
+      <section id={catalogueId} className={styles.catalogue} aria-label="Ready items" hidden={!catalogueVisible}>
+        {(!embedded || browse !== "unopened") && <>
         <div className={styles.toolbar}>
           <div className={styles.tabs} aria-label="Catalogue view" role="group">
             <button type="button" aria-pressed={tab === "browse"} onClick={() => setTab("browse")}>Browse</button>
@@ -454,6 +477,7 @@ function WardrobePreview({ initial, sessionId, embedded }: {
             );
           })}
         </ul>
+        </>}
       </section>
       </div>
       <dialog ref={artworkDialog} className={styles.artworkDialog} aria-labelledby={uid + "-artwork"}
