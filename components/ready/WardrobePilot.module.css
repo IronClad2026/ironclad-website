@@ -335,6 +335,11 @@
     grid-template-columns: minmax(9.5rem, 27%) minmax(0, 1fr);
   }
 
+  /* Keep the sticky preview below the fixed header even at the last item. */
+  .catalogue {
+    padding-block-end: max(5.5rem, calc(100svh - var(--preview-top) - 3rem));
+  }
+
   .studio { padding: 0.5rem; }
   .previewSummary {
     grid-template-columns: 1fr;
@@ -346,5 +351,6 @@
   .model { width: min(100%, 7.5rem); }
   .studio[data-larger="true"] .stage { max-height: none; }
   .studio[data-larger="true"] .model { width: min(100%, 9rem); }
+  .feedback { min-height: 1.2em; }
   .row button { scroll-margin-block-start: var(--preview-top); }
 }
