@@ -3,6 +3,8 @@ import * as THREE from './vendor/build/three.module.min.js';
 const cigarette = 'mouth_cigarette';
 const dynamite = 'mouth_sparking_dynamite_stick';
 const makeup = 'face_clown_makeup';
+const upperMakeup = 'upper-basecolor.webp';
+const lowerMakeup = 'lower-basecolor.webp';
 const beret = 'headwear_tanker_beret';
 const slouch = 'headwear_australian_slouch_hat';
 const cranium = 'headwear_open_cranium';
@@ -353,7 +355,7 @@ export function createItemAdapter(runtime, nodeNamed) {
 
   return {
     resources(id) {
-      if (id === makeup) return [[makeup, 'upper-basecolor.png', 'upperPaint'], [makeup, 'lower-basecolor.png', 'lowerPaint']];
+      if (id === makeup) return [[makeup, upperMakeup, 'upperPaint'], [makeup, lowerMakeup, 'lowerPaint']];
       const wearable = [id, 'wearable.glb'];
       if (id === cigarette || id === dynamite) return [wearable, [cigarette, 'repaired-bite.glb']];
       if (savedHeadFitting.has(id)) return [wearable, [beret, 'helmet-free-r5.glb']];
@@ -362,8 +364,8 @@ export function createItemAdapter(runtime, nodeNamed) {
     },
     create(id, get) {
       if (id === makeup) return {
-        skullMaterial: get(makeup, 'upper-basecolor.png'),
-        jawMaterial: get(makeup, 'lower-basecolor.png'),
+        skullMaterial: get(makeup, upperMakeup),
+        jawMaterial: get(makeup, lowerMakeup),
       };
       const { scene: cached, animations } = get(id, 'wearable.glb');
       // These wearable hierarchies have no skins. Geometry and textures stay shared with the session cache.

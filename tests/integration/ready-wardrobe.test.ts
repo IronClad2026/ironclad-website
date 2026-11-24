@@ -86,6 +86,22 @@ describe("Ready Wardrobe pilot", () => {
     expect(mocks.download).not.toHaveBeenCalled();
   });
 
+  it("serves only the two explicitly listed lossless textures behind fresh outfit access", async () => {
+    for (const name of ["upper-basecolor.webp", "lower-basecolor.webp"]) {
+      const paint = asset(name, "GET", "face_clown_makeup");
+      mocks.authority.mockResolvedValueOnce({ access: "locked", sessionId: null });
+      expect((await GET(paint.request, paint.context)).status).toBe(403);
+      mocks.authority.mockResolvedValueOnce({ access: "subscriber", sessionId: demoSession, userId: owner });
+      const response = await GET(paint.request, paint.context);
+      expect(response.status).toBe(200);
+      expect(response.headers.get("content-type")).toBe("image/webp");
+      expect(response.headers.get("cache-control")).toContain("private, no-store");
+      expect(mocks.download).toHaveBeenLastCalledWith(`v3/face_clown_makeup/${name}`, {}, expect.anything());
+    }
+    const unlisted = asset("upper-basecolor.webp", "GET", aviators);
+    expect((await GET(unlisted.request, unlisted.context)).status).toBe(404);
+  });
+
   it("saves only the authenticated owner's validated choice and supports removal", async () => {
     const input = { userId: "player-other", sessionId: demoSession, itemIds: [aviators] };
     expect((await save(input)).status).toBe(403);
