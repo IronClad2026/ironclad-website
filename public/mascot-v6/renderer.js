@@ -4,8 +4,10 @@ import { createAttentionTargetPicker } from './attention-targets.js';
 import { clamp, morphBinding, PoseController } from './pose.js';
 import { Smoke, Tears } from './effects.js';
 import { VisibleFrameMetrics } from './metrics.js';
+import { createStockAssetLoader } from './stock-assets.js';
 
 const assetPath = new URL('./assets/', import.meta.url);
+const loadStockAssets = createStockAssetLoader(assetPath);
 const views = { front: 0, 'three-quarter': THREE.MathUtils.degToRad(36) };
 const blinkIntervals = [4.2, 6.6, 5.1, 7.4];
 
@@ -56,12 +58,6 @@ function disposeAsset(model) {
   }
   for (const image of decoded) image.close();
   model.removeFromParent();
-}
-
-async function fetchAsset(name, signal) {
-  const response = await fetch(new URL(name, assetPath), { signal });
-  if (!response.ok) throw new Error(name + ' returned HTTP ' + response.status);
-  return response;
 }
 
 export function idleFramingPadding({ pitch, yaw }) {
@@ -428,10 +424,8 @@ export function createMascotRenderer({ canvas, onStatus, onAnchor, onWardrobeCap
     const loader = new GLTFLoader();
     try {
       runtime = new MascotScene(canvas, onAnchor, () => options.mode);
-      const [config, bytes] = await Promise.all([
-        fetchAsset('interaction.json', abort.signal).then(response => response.json()),
-        fetchAsset('ironclad.glb', abort.signal).then(response => response.arrayBuffer()),
-      ]);
+      const [config, bytes] = await loadStockAssets();
+      abort.signal.throwIfAborted();
       const asset = await loader.parseAsync(bytes, assetPath.href);
       if (disposed) {
         disposeAsset(asset.scene);

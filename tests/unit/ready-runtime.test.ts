@@ -5,6 +5,7 @@ import { answerWithReadyModel } from "@/lib/ready/provider";
 import { buildReadyGrounding } from "@/lib/ready/grounding";
 import { createReadyRateGuard, getReadyBudgetConfig } from "@/lib/ready/usage";
 import { POST } from "@/app/api/ready/route";
+import { createStockAssetLoader } from "@/public/mascot-v6/stock-assets.js";
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/ready/session", () => ({ loadReadyAccess: vi.fn() }));
@@ -31,6 +32,38 @@ afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
   vi.clearAllMocks();
+});
+
+describe("Ready stock downloads", () => {
+  const root = new URL("https://staging.example/mascot-v6/assets/");
+
+  it("shares the header and wardrobe download without keeping the model in memory", async () => {
+    const fetchAsset = vi.fn((url: URL) => Promise.resolve(url.pathname.endsWith(".glb")
+      ? new Response(Uint8Array.of(1, 2, 3))
+      : Response.json({ rig: "V6" })));
+    vi.stubGlobal("fetch", fetchAsset);
+    const load = createStockAssetLoader(root);
+    const header = load();
+    expect(load()).toBe(header);
+    const [config, model] = await header;
+    expect(config).toEqual({ rig: "V6" });
+    expect(model.byteLength).toBe(3);
+    expect(fetchAsset).toHaveBeenCalledTimes(2);
+    await load();
+    expect(fetchAsset).toHaveBeenCalledTimes(4);
+  });
+
+  it("retries one failed model transfer outside the disk cache", async () => {
+    const fetchAsset = vi.fn((url: URL, options: RequestInit) => {
+      if (url.pathname.endsWith(".json")) return Promise.resolve(Response.json({ rig: "V6" }));
+      if (options.cache === "default") return Promise.reject(new TypeError("Failed to fetch"));
+      return Promise.resolve(new Response(Uint8Array.of(1)));
+    });
+    vi.stubGlobal("fetch", fetchAsset);
+    await expect(createStockAssetLoader(root)()).resolves.toEqual([{ rig: "V6" }, Uint8Array.of(1).buffer]);
+    expect(fetchAsset.mock.calls.filter(([url]) => url.pathname.endsWith(".glb")).map(([, request]) => request.cache))
+      .toEqual(["default", "no-store"]);
+  });
 });
 
 describe("Ready input and review access", () => {
