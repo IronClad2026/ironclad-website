@@ -55,26 +55,28 @@ export default function DashboardIdentity({
             >
               {!avatarUrl && <UserRound size={28} className="text-zinc-400" aria-hidden="true" />}
             </div>
-            <div className="min-w-0">
-              <h2 className="break-words text-2xl font-black leading-tight tracking-tight text-white sm:text-3xl">
+            <div className="min-w-0 has-[>[data-wardrobe-expanded=true]]:contents">
+              <h2 className="col-start-2 break-words text-2xl font-black leading-tight tracking-tight text-white sm:text-3xl">
                 {profile.display_name}
               </h2>
               {wardrobeEnabled ? <DashboardReadyWardrobe /> : null}
-              <p className="mt-1 break-words text-sm font-semibold text-zinc-300">{profile.in_game_name}</p>
-              <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-2">
-                <p className="text-sm text-zinc-400">
-                  <span className="mr-2 text-lg font-black tabular-nums text-orange-300">
-                    {profile.current_elo === null ? t("dashboard.notAvailable") : formatNumber(profile.current_elo, locale)}
+              <div className="col-start-2 min-w-0">
+                <p className="mt-1 break-words text-sm font-semibold text-zinc-300">{profile.in_game_name}</p>
+                <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-2">
+                  <p className="text-sm text-zinc-400">
+                    <span className="mr-2 text-lg font-black tabular-nums text-orange-300">
+                      {profile.current_elo === null ? t("dashboard.notAvailable") : formatNumber(profile.current_elo, locale)}
+                    </span>
+                    {t("dashboard.profile.currentElo")}
+                  </p>
+                  <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${complete ? "text-emerald-300" : "text-orange-300"}`}>
+                    <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-current" />
+                    {t(complete ? "dashboard.profile.completeStatus" : "dashboard.profile.incompleteStatus")}
                   </span>
-                  {t("dashboard.profile.currentElo")}
-                </p>
-                <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${complete ? "text-emerald-300" : "text-orange-300"}`}>
-                  <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-current" />
-                  {t(complete ? "dashboard.profile.completeStatus" : "dashboard.profile.incompleteStatus")}
-                </span>
+                </div>
               </div>
             </div>
-            <nav aria-label={t("dashboard.profile.navigation")} className="col-span-2 flex flex-wrap gap-2 xl:col-span-1 xl:justify-end">
+            <nav aria-label={t("dashboard.profile.navigation")} className="col-span-2 flex flex-wrap gap-2 xl:col-span-1 xl:col-start-3 xl:row-start-1 xl:justify-end">
               <Link
                 href="/tournaments"
                 className="inline-flex min-h-11 items-center justify-center gap-2 bg-orange-500 px-3 py-2 text-sm font-bold text-black transition hover:bg-orange-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
@@ -104,8 +106,8 @@ export default function DashboardIdentity({
             </dl>
           </div>
         ) : (
-          <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
+          <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between sm:has-[[data-wardrobe-expanded=true]]:flex-col sm:has-[[data-wardrobe-expanded=true]]:items-start">
+            <div className="min-w-0 has-[>[data-wardrobe-expanded=true]]:w-full">
               <h2 className="text-xl font-bold text-white">{t("dashboard.profile.requiredTitle")}</h2>
               {wardrobeEnabled ? <DashboardReadyWardrobe /> : null}
               <p className="mt-1 text-sm leading-5 text-zinc-400">{t("dashboard.profile.requiredDescription")}</p>

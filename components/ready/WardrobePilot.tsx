@@ -2,7 +2,8 @@
 
 import { useAuth } from "@clerk/nextjs";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { Expand, ImageIcon, LockKeyhole, Minus, Plus, SlidersHorizontal, X } from "lucide-react";
+import { useEffect, useId, useRef, useState } from "react";
 import { READY_DOCK_POSTER_DATA } from "@/lib/ready/poster-data";
 import {
   emptyWardrobe,
@@ -14,6 +15,7 @@ import {
   wardrobeItems,
   type WardrobeSelection,
   type WardrobeState,
+  type WardrobeItemId,
 } from "@/lib/wardrobe/catalogue";
 import { invalidateWardrobe, observeWardrobe, readWardrobe, saveWardrobe } from "@/lib/wardrobe/client";
 import {
@@ -23,6 +25,7 @@ import {
   type MascotView,
   type TalkStyle,
 } from "./renderer";
+import styles from "./WardrobePilot.module.css";
 
 const control = "min-h-11 rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm font-semibold text-zinc-100 hover:border-orange-500 focus-visible:outline-2 focus-visible:outline-orange-400 disabled:opacity-50";
 const selected = "aria-pressed:border-orange-400 aria-pressed:text-orange-300";
@@ -31,6 +34,40 @@ const talkStyles: [string, TalkStyle][] = [
   ["Enthusiastic", "Talk_Enthusiastic"],
   ["Gentle", "Talk_Gentle"],
 ];
+const categories = {
+  eyes: "Eyewear",
+  mouth: "Mouth",
+  teeth: "Mouth",
+  replacement: "Headwear",
+  helmet: "Helmet accessories",
+  "helmet-side": "Helmet accessories",
+  visor: "Helmet accessories",
+  face: "Face",
+  paint: "Face",
+  hair: "Face",
+} as const satisfies Record<(typeof wardrobeItems)[number]["slot"], string>;
+const categoryOptions = [...new Set(Object.values(categories))];
+const presetThumbnailId = "helmet_trim_dynamite_helmet_band";
+
+function WardrobeThumbnail({ src }: { src: string }) {
+  const thumbnail = useRef<HTMLImageElement>(null);
+  const [inRange, setInRange] = useState(false);
+  useEffect(() => {
+    if (!thumbnail.current || typeof IntersectionObserver === "undefined") return;
+    // Native lazy loading can fetch every image in this compact catalogue at once.
+    const observer = new IntersectionObserver(([entry]) => {
+      if (!entry.isIntersecting) return;
+      setInRange(true);
+      observer.disconnect();
+    }, { rootMargin: "120px 0px" });
+    observer.observe(thumbnail.current);
+    return () => observer.disconnect();
+  }, []);
+
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img ref={thumbnail} className={styles.thumbnail}
+    src={inRange ? src : undefined} width={56} height={56} decoding="async" alt="" />;
+}
 
 export default function WardrobePilot({ initial = emptyWardrobe, embedded = false }: {
   initial?: WardrobeState;
@@ -64,11 +101,40 @@ function WardrobePreview({ initial, sessionId, embedded }: {
   const [pending, setPending] = useState<WardrobeSelection | null>(null);
   const [message, setMessage] = useState("");
   const [caption, setCaption] = useState("");
-  const [preview, setPreview] = useState<"standalone" | "fitted">("standalone");
+  const [tab, setTab] = useState<"browse" | "equipped">("browse");
+  const [category, setCategory] = useState("");
+  const [artwork, setArtwork] = useState<(typeof wardrobeItems)[number] | null>(null);
+  const [artworkView, setArtworkView] = useState<"standalone" | "fitted">("standalone");
+  const [artworkZoom, setArtworkZoom] = useState(false);
+  const [larger, setLarger] = useState(false);
+  const artworkDialog = useRef<HTMLDialogElement>(null);
+  const artworkTrigger = useRef<HTMLButtonElement>(null);
+  const equippedTab = useRef<HTMLButtonElement>(null);
+  const removeTrigger = useRef<HTMLButtonElement>(null);
+  const uid = useId();
   const [angle, setAngle] = useState<MascotView>("front");
   const [size, setSize] = useState<"Desktop" | 51 | 56>("Desktop");
   const entitled = state.access !== "locked";
   const selection = pending ?? state;
+  const listedItems = wardrobeItems.filter(item => tab === "equipped"
+    ? state.itemIds.includes(item.id)
+    : !category || categories[item.slot] === category);
+  const showPreset = tab === "equipped" ? Boolean(state.dynamiteRestore) : !category;
+  const assetUrl = (id: WardrobeItemId, view: "standalone" | "fitted") =>
+    wardrobeAssetUrl(id, view + (entitled ? ".webp" : "-blur.webp"));
+  const presetThumbnail = assetUrl(presetThumbnailId, "standalone");
+
+  useEffect(() => {
+    if (artwork) artworkDialog.current?.showModal();
+  }, [artwork]);
+
+  useEffect(() => {
+    if (pending || !removeTrigger.current) return;
+    if (tab === "equipped" && !removeTrigger.current.isConnected && document.activeElement === document.body) {
+      equippedTab.current?.focus({ preventScroll: true });
+    }
+    removeTrigger.current = null;
+  }, [pending, tab]);
 
   useEffect(() => {
     const active = new AbortController();
@@ -236,15 +302,15 @@ function WardrobePreview({ initial, sessionId, embedded }: {
   }
 
   const PreviewHeading = embedded ? "h4" : "h2";
-  const ItemHeading = embedded ? "h4" : "h3";
+  const ItemHeading = embedded ? "h5" : "h3";
   const workspace = (
-    <div className={embedded
-      ? "mt-3 grid gap-4 @min-[46rem]:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)]"
-      : "mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)]"}>
-      <section className="min-w-0 rounded-xl border border-zinc-800 bg-zinc-950 p-4 sm:p-6" aria-labelledby="wardrobe-preview-heading">
-        <PreviewHeading id="wardrobe-preview-heading" className="text-xl font-semibold text-zinc-100">Ready Preview</PreviewHeading>
-        <div className="my-4 grid min-h-[150px] place-items-center rounded-lg bg-zinc-900">
-          <div className="relative aspect-square" style={{ width: size === "Desktop" ? "min(100%, 410px)" : size }}>
+    <div className={styles.container}>
+      <div className={styles.workspace} data-ready-wardrobe-workspace="">
+      <section className={styles.studio} data-larger={larger} aria-labelledby={uid + "-preview"}>
+        <div className={styles.previewSummary}>
+          <PreviewHeading id={uid + "-preview"} className={styles.previewHeading}>Ready preview</PreviewHeading>
+          <div className={styles.stage}>
+            <div className={styles.model} style={size === "Desktop" ? undefined : { width: size }}>
             <canvas ref={canvas} aria-label="Ready 3D preview" role="img"
               className="absolute inset-0 size-full" style={{ visibility: status === "ready" ? "visible" : "hidden" }}
               data-wardrobe-renderer={status} data-wardrobe-items={visibleItems} />
@@ -252,9 +318,29 @@ function WardrobePreview({ initial, sessionId, embedded }: {
               // eslint-disable-next-line @next/next/no-img-element
               <img src={READY_DOCK_POSTER_DATA} alt="Stock Ready" className="absolute inset-0 size-full object-contain" />
             )}
+            </div>
           </div>
+          <div className={styles.previewActions}>
+            <button type="button" className={`${control} ${styles.resize}`} aria-expanded={larger}
+              onClick={() => {
+                resizePreview("Desktop");
+                setLarger(!larger);
+              }}>
+              <Expand aria-hidden="true" size={16} /> {larger ? "Compact preview" : "Larger preview"}
+            </button>
+          </div>
+          <p className={styles.feedback} role="status">
+            {pending ? "Updating Ready’s look…" : message || (status === "loading" ? "Loading preview…" :
+              status === "error" ? "Live preview unavailable. Item artwork is still available." : "")}
+          </p>
         </div>
-        {status === "error" && <p className="my-2 text-sm text-zinc-300">Live 3D preview is unavailable. You can still view the item artwork.</p>}
+        <details className={styles.options} onToggle={event => {
+          if (!event.currentTarget.open) return;
+          const preview = event.currentTarget.parentElement;
+          if (preview && preview.getBoundingClientRect().top < 0) preview.scrollIntoView({ block: "start" });
+        }}>
+          <summary className={control}><SlidersHorizontal aria-hidden="true" size={16} /> Preview options</summary>
+          <div className={styles.optionsBody}>
         <div className="flex flex-wrap gap-2" aria-label="Preview angle" role="group">
           <button className={control + " " + selected} aria-pressed={angle === "front"} onClick={() => setView("front")}>Front</button>
           <button className={control + " " + selected} aria-pressed={angle === "three-quarter"} onClick={() => setView("three-quarter")}>Three-quarter</button>
@@ -263,7 +349,7 @@ function WardrobePreview({ initial, sessionId, embedded }: {
         <div className="mt-3 flex flex-wrap gap-2" aria-label="Preview size" role="group">
           {(["Desktop", 51, 56] as const).map(value => (
             <button key={value} className={control + " " + selected} aria-pressed={size === value} onClick={() => resizePreview(value)}>
-              {value === "Desktop" ? value : value + " px"}
+              {value === "Desktop" ? "Standard size" : value + " px"}
             </button>
           ))}
         </div>
@@ -284,65 +370,123 @@ function WardrobePreview({ initial, sessionId, embedded }: {
             <button className={control} onClick={() => renderer.current?.commandWardrobe("raise-visor")}>Raise visor</button>
           </div>
         )}
+          </div>
+        </details>
       </section>
-      <section className={embedded ? "@container min-w-0" : "min-w-0"} aria-label="Ready items">
-        <p className="mb-3 text-sm text-zinc-300">
-          {state.access === "admin" ? "Private admin preview"
-            : state.access === "subscriber" ? "Staging Supporter access"
-              : "IronClad Supporters can equip and save these items. Subscriptions are unavailable in this pilot."}
-        </p>
-        {!sessionId && <Link prefetch={false} className="mb-3 inline-block text-orange-300 underline" href="/sign-in?redirect_url=%2Fprofile%2Fready">Sign in</Link>}
-        <div className="mb-3 flex flex-wrap gap-2" aria-label="Item artwork" role="group">
-          <button className={control + " " + selected} aria-pressed={preview === "standalone"} onClick={() => setPreview("standalone")}>Standalone</button>
-          <button className={control + " " + selected} aria-pressed={preview === "fitted"} onClick={() => setPreview("fitted")}>Fitted on Ready</button>
+      <section className={styles.catalogue} aria-label="Ready items">
+        <div className={styles.toolbar}>
+          <div className={styles.tabs} aria-label="Catalogue view" role="group">
+            <button type="button" aria-pressed={tab === "browse"} onClick={() => setTab("browse")}>Browse</button>
+            <button type="button" ref={equippedTab} aria-pressed={tab === "equipped"} onClick={() => setTab("equipped")}>
+              Equipped ({state.itemIds.length})
+            </button>
+          </div>
+          {tab === "browse" && (
+            <select aria-label="Category" className={styles.category} value={category}
+              onChange={event => setCategory(event.target.value)}>
+              <option value="">All categories</option>
+              {categoryOptions.map(value => <option key={value} value={value}>{value}</option>)}
+            </select>
+          )}
         </div>
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2">
-          <div>
-            <p className="font-semibold text-zinc-100">Dynamite Set</p>
-            <p className="text-sm text-zinc-400">Dynamite Helmet Band and Sparking Dynamite Stick</p>
+        {!entitled && <p className={styles.notice}>
+          IronClad Supporters can equip and save these items. Subscriptions are unavailable in this pilot.
+          {!sessionId && <> <Link prefetch={false} className="text-orange-300 underline"
+            href="/sign-in?redirect_url=%2Fprofile%2Fready">Sign in</Link></>}
+        </p>}
+        {showPreset && <div className={`${styles.row} ${styles.preset}`}>
+          <WardrobeThumbnail key={presetThumbnail} src={presetThumbnail} />
+          <div className={styles.itemCopy}>
+            <ItemHeading>Dynamite Set</ItemHeading>
+            <p>2-item preset · Helmet Band and Sparking Stick</p>
           </div>
           {entitled
-            ? <button className={control} disabled={status !== "ready"}
-                onClick={() => void updateSelection(toggleDynamiteSet)}>
-                {selection.dynamiteRestore ? "Remove Dynamite Set" : "Equip Dynamite Set"}
+            ? <button type="button" className={styles.itemAction} data-equipped={Boolean(selection.dynamiteRestore)}
+                aria-label={selection.dynamiteRestore ? "Remove Dynamite Set" : "Equip Dynamite Set"}
+                disabled={status !== "ready"}
+                onClick={event => {
+                  if (tab === "equipped") removeTrigger.current = event.currentTarget;
+                  void updateSelection(toggleDynamiteSet);
+                }}>
+                {selection.dynamiteRestore ? "Remove" : "Equip"}
               </button>
-            : <span className="text-sm text-zinc-400">Locked</span>}
-        </div>
-        <p className="mb-3 min-h-6 text-sm text-zinc-300" role="status">{pending ? "Updating Ready’s look…" : message}</p>
-        <ul className={embedded
-          ? "grid gap-3 @min-[22rem]:grid-cols-2 @min-[35rem]:grid-cols-3"
-          : "grid gap-3 sm:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3"}>
-          {wardrobeItems.map(item => {
+            : <span className={styles.lock}><LockKeyhole size={14} aria-hidden="true" /> Locked</span>}
+        </div>}
+        {listedItems.length === 0 && (
+          <p className={styles.notice}>{tab === "equipped" ? "No items equipped. Choose an item in Browse to change Ready’s look." : "No items in this category."}</p>
+        )}
+        <ul className={styles.items}>
+          {listedItems.map(item => {
             const equipped = selection.itemIds.includes(item.id);
             const constraint = itemConstraint(item.id, selection.itemIds);
-            const file = preview + (entitled ? ".webp" : "-blur.webp");
+            const thumbnail = assetUrl(item.id, "standalone");
             return (
-              <li key={item.id} className="flex min-w-0 flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950">
-                {/* The server mediates all sharp bytes. The public variants are separately rendered WebPs. */}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img className="aspect-square w-full bg-zinc-900 object-contain" src={wardrobeAssetUrl(item.id, file)}
-                  width={512} height={512} loading="lazy" decoding="async"
-                  alt={`${item.name} ${preview} ${entitled ? "preview" : "blurred preview"}`} />
-                <div className="flex grow flex-col items-start gap-3 p-3">
-                  <ItemHeading className="text-base font-semibold text-zinc-100">{item.name}</ItemHeading>
-                  {entitled && constraint && <span className="text-xs text-zinc-400">{constraint}</span>}
-                  {entitled ? (
-                    <button className={control + " mt-auto"} disabled={status !== "ready"}
-                      aria-label={`${equipped ? "Remove" : "Equip"} ${item.name}`}
-                      onClick={() => void updateSelection(outfit => toggleWardrobeItem(outfit, item.id))}>
-                      {equipped ? "Remove" : "Equip"}
-                    </button>
-                  ) : <span className="mt-auto text-sm text-zinc-400">Locked</span>}
+              <li key={item.id} className={styles.row} data-equipped={equipped}>
+                <button type="button" className={styles.artworkTrigger} aria-label={`View artwork for ${item.name}`}
+                  onClick={event => {
+                    artworkTrigger.current = event.currentTarget;
+                    setArtworkView("standalone");
+                    setArtworkZoom(false);
+                    setArtwork(item);
+                  }}>
+                  <WardrobeThumbnail key={thumbnail} src={thumbnail} />
+                  <ImageIcon className={styles.artworkIcon} aria-hidden="true" size={13} />
+                </button>
+                <div className={styles.itemCopy}>
+                  <ItemHeading>{item.name}</ItemHeading>
+                  <p>{categories[item.slot]}</p>
+                  {entitled && constraint && <p className={styles.constraint}>
+                    {equipped && !constraint.startsWith("Hidden") ? "Saved · " : ""}{constraint}
+                  </p>}
                 </div>
+                {entitled ? (
+                  <button type="button" className={styles.itemAction} data-equipped={equipped} disabled={status !== "ready"}
+                    aria-label={`${equipped ? "Remove" : "Equip"} ${item.name}`}
+                    onClick={event => {
+                      if (tab === "equipped") removeTrigger.current = event.currentTarget;
+                      void updateSelection(outfit => toggleWardrobeItem(outfit, item.id));
+                    }}>
+                    {equipped ? <Minus aria-hidden="true" size={15} /> : <Plus aria-hidden="true" size={15} />}
+                    {equipped ? "Remove" : "Equip"}
+                  </button>
+                ) : <span className={styles.lock}><LockKeyhole size={14} aria-hidden="true" /> Locked</span>}
               </li>
             );
           })}
         </ul>
       </section>
+      </div>
+      <dialog ref={artworkDialog} className={styles.artworkDialog} aria-labelledby={uid + "-artwork"}
+        onClose={() => {
+          setArtwork(null);
+          artworkTrigger.current?.focus({ preventScroll: true });
+        }}>
+        {artwork && <>
+          <div className={styles.artworkHeading}>
+            <h2 id={uid + "-artwork"}>{artwork.name}</h2>
+            <button type="button" className={control} aria-label="Close artwork" autoFocus
+              onClick={() => artworkDialog.current?.close()}><X aria-hidden="true" size={20} /></button>
+          </div>
+          <div className={styles.artworkFrame} data-zoom={artworkZoom}
+            tabIndex={artworkZoom ? 0 : undefined} aria-label="Artwork close-up" role="region">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img key={entitled ? "clear" : "blurred"} className={styles.artworkImage} src={assetUrl(artwork.id, artworkView)} alt={
+              `${entitled ? "" : "Blurred "}${artwork.name}${artworkView === "fitted" ? " on Ready" : " standalone artwork"}`} />
+          </div>
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Artwork view">
+            <button type="button" className={control + " " + selected} aria-pressed={artworkView === "standalone"}
+              onClick={() => setArtworkView("standalone")}>Standalone</button>
+            <button type="button" className={control + " " + selected} aria-pressed={artworkView === "fitted"}
+              onClick={() => setArtworkView("fitted")}>Fitted on Ready</button>
+            <button type="button" className={control + " " + selected} aria-pressed={artworkZoom}
+              onClick={() => setArtworkZoom(!artworkZoom)}>Close-up</button>
+          </div>
+        </>}
+      </dialog>
     </div>
   );
 
-  if (embedded) return <div className="@container">{workspace}</div>;
+  if (embedded) return workspace;
 
   return (
     <main className="min-h-screen bg-zinc-950 px-4 pt-28 pb-12 text-zinc-100 sm:px-8 sm:pt-32">

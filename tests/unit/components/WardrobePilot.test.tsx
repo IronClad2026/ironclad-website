@@ -3,6 +3,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import WardrobePilot from "@/components/ready/WardrobePilot";
+import type { WardrobeState } from "@/lib/wardrobe/catalogue";
 
 const mocks = vi.hoisted(() => ({
   prepare: vi.fn(),
@@ -90,4 +91,34 @@ it("leaves the prior outfit visible and saves nothing if a set resource fails", 
   expect(screen.getByRole("button", { name: "Equip Dynamite Set" })).toBeEnabled();
   expect(mocks.commit).not.toHaveBeenCalled();
   expect(request).toHaveBeenCalledTimes(1);
+});
+
+it("filters the catalogue without remounting the preview and keeps hidden saved items in Equipped", async () => {
+  const outfit: WardrobeState = { ...initial, itemIds: ["eyewear_smoked_aviators", "headwear_wwii_full_face_helmet"] };
+  const request = vi.fn((_url: string, init: RequestInit) => Promise.resolve(Response.json({
+    ...outfit, ...(init.method === "POST" ? JSON.parse(String(init.body)) : {}),
+  })));
+  vi.stubGlobal("fetch", request);
+  mocks.prepare.mockResolvedValue({ commit: mocks.commit, discard: vi.fn() });
+  render(<WardrobePilot initial={outfit} />);
+
+  const canvas = await screen.findByRole("img", { name: "Ready 3D preview" });
+  await waitFor(() => expect(mocks.commit).toHaveBeenCalledOnce());
+  fireEvent.change(screen.getByRole("combobox", { name: "Category" }), { target: { value: "Helmet accessories" } });
+  expect(screen.getByRole("button", { name: "Equip Tanker’s Crown" })).toBeVisible();
+  expect(screen.queryByRole("button", { name: "Remove Smoked Aviators" })).not.toBeInTheDocument();
+  expect(screen.getByRole("img", { name: "Ready 3D preview" })).toBe(canvas);
+
+  fireEvent.click(screen.getByRole("button", { name: "Equipped (2)" }));
+  expect(screen.getByRole("button", { name: "Remove Smoked Aviators" })).toBeVisible();
+  expect(screen.getByText("Hidden by WWII Full-Face Helmet")).toBeVisible();
+  expect(screen.queryByRole("button", { name: "Equip Tanker’s Crown" })).not.toBeInTheDocument();
+  expect(screen.getByRole("img", { name: "Ready 3D preview" })).toBe(canvas);
+  expect(mocks.prepare).toHaveBeenCalledOnce();
+  expect(request).toHaveBeenCalledOnce();
+
+  const remove = screen.getByRole("button", { name: "Remove Smoked Aviators" });
+  remove.focus();
+  fireEvent.click(remove);
+  await waitFor(() => expect(screen.getByRole("button", { name: "Equipped (1)" })).toHaveFocus());
 });

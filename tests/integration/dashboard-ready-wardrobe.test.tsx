@@ -68,6 +68,7 @@ describe("the dashboard wardrobe", () => {
     expect(screen.getByRole("heading", { name: profile.display_name }).nextElementSibling).toBe(region);
     expect(region.querySelector("img")).toHaveAttribute("src", expect.stringContaining("data:image/"));
     expect(screen.getByRole("button", { name: "Open wardrobe" })).toHaveAttribute("aria-expanded", "false");
+    expect(region).not.toHaveAttribute("data-wardrobe-expanded");
     expect(loadWorkspace).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole("button", { name: "Open wardrobe" }));
@@ -75,13 +76,33 @@ describe("the dashboard wardrobe", () => {
     expect(window.location.hash).toBe("#ready-wardrobe");
     view.rerender(identity(true));
     expect(await screen.findByText("Shared wardrobe workspace")).toHaveAttribute("data-test-embedded", "true");
+    expect(region).toHaveAttribute("data-wardrobe-expanded", "true");
+    expect(region).toHaveClass("col-span-full");
     await waitFor(() => expect(region).toHaveFocus());
 
     fireEvent.click(screen.getByRole("button", { name: "Close wardrobe" }));
     view.rerender(identity(true));
     expect(screen.queryByText("Shared wardrobe workspace")).toBeNull();
+    expect(region).not.toHaveAttribute("data-wardrobe-expanded");
     expect(window.location.search).toBe("?view=matches&team=first&team=second");
     expect(window.location.hash).toBe("");
+  });
+
+  it.each([false, true])("opens one workspace from an invitation without a profile (load error: %s)", async (error) => {
+    const dashboard = () => (
+      <DashboardIdentity profile={null} error={error} locale="en" t={(key) => key} wardrobeEnabled />
+    );
+    const view = render(dashboard());
+    const region = screen.getByRole("region", { name: "Ready Wardrobe" });
+    expect(screen.queryByText("Shared wardrobe workspace")).not.toBeInTheDocument();
+    if (!error) expect(screen.getByRole("heading", { name: "dashboard.profile.requiredTitle" }).nextElementSibling).toBe(region);
+
+    act(() => window.dispatchEvent(new Event(readyWardrobeOpenEvent)));
+    view.rerender(dashboard());
+    expect(await screen.findAllByText("Shared wardrobe workspace")).toHaveLength(1);
+    expect(region).toHaveAttribute("data-wardrobe-expanded", "true");
+    await waitFor(() => expect(region).toHaveFocus());
+    expect(window.location.hash).toBe("#ready-wardrobe");
   });
 
   it("opens from the direct URL and refocuses the region when invited again on the same route", async () => {
