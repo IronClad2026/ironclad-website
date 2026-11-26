@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useRef } from "react";
 import { acceptAccountLegalUpdate } from "@/app/legal-update-actions";
 import type { AccountLegalAcceptanceActionState } from "@/app/legal-update-actions";
+import { CASTER_LEGAL_PATH } from "@/lib/caster/routes";
 import type {
   AccountLegalGateDocument,
   AccountLegalGateState,
@@ -41,11 +42,15 @@ type RequiredGateState = Extract<AccountLegalGateState, { status: "required" }>;
 type AccountLegalUpdateShellProps = {
   state: RequiredGateState | { status: "unavailable" };
   copy: AccountLegalUpdateCopy;
+  casterSubmission?: boolean;
+  formError?: "acceptance-required" | "unavailable";
 };
 
 export default function AccountLegalUpdateShell({
   state,
   copy,
+  casterSubmission,
+  formError,
 }: AccountLegalUpdateShellProps) {
   const headingRef = useRef<HTMLHeadingElement>(null);
 
@@ -78,7 +83,7 @@ export default function AccountLegalUpdateShell({
         {state.status === "unavailable" ? (
           <UnavailableControls copy={copy} />
         ) : (
-          <RequiredAcceptance state={state} copy={copy} />
+          <RequiredAcceptance state={state} copy={copy} casterSubmission={casterSubmission} formError={formError} />
         )}
       </section>
     </main>
@@ -88,15 +93,20 @@ export default function AccountLegalUpdateShell({
 function RequiredAcceptance({
   state,
   copy,
+  casterSubmission,
+  formError,
 }: {
   state: RequiredGateState;
   copy: AccountLegalUpdateCopy;
+  casterSubmission?: boolean;
+  formError?: "acceptance-required" | "unavailable";
 }) {
   const router = useRouter();
   const [actionState, formAction, pending] = useActionState(
     acceptAccountLegalUpdate,
     initialState
   );
+  const messageCode = actionState.code === "idle" ? formError : actionState.code;
 
   useEffect(() => {
     if (actionState.status === "success") {
@@ -121,7 +131,11 @@ function RequiredAcceptance({
         />
       </div>
 
-      <form action={formAction} className="mt-7">
+      <form
+        action={casterSubmission ? CASTER_LEGAL_PATH : formAction}
+        method={casterSubmission ? "post" : undefined}
+        className="mt-7"
+      >
         <input
           type="hidden"
           name="termsDocumentId"
@@ -158,9 +172,9 @@ function RequiredAcceptance({
           </label>
         </fieldset>
 
-        {actionState.status !== "idle" && (
+        {messageCode && (
           <p
-            role={actionState.status === "error" ? "alert" : "status"}
+            role={actionState.status === "success" ? "status" : "alert"}
             aria-live="polite"
             className={`mt-4 border p-4 text-sm ${
               actionState.status === "success"
@@ -168,7 +182,7 @@ function RequiredAcceptance({
                 : "border-red-500/30 bg-red-500/10 text-red-200"
             }`}
           >
-            {getActionMessage(actionState.code, copy)}
+            {getActionMessage(messageCode, copy)}
           </p>
         )}
 

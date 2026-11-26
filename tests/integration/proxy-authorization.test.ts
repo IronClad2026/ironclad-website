@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { unstable_doesMiddlewareMatch as doesProxyMatch } from "next/experimental/testing/server";
 
 const clerkMiddlewareMock = vi.hoisted(() =>
-  vi.fn((handler: unknown) => handler),
+  vi.fn((handler: (auth: unknown, request: unknown) => unknown) =>
+    (request: unknown, event: { auth: unknown }) => handler(event.auth, request)),
 );
 
 vi.mock("@clerk/nextjs/server", () => ({
@@ -22,10 +23,11 @@ type ProxyRequest = {
   };
 };
 
-const proxyHandler = proxy as unknown as (
-  auth: ProxyAuth,
+const invokeProxy = proxy as unknown as (
   request: ProxyRequest,
+  event: { auth: ProxyAuth },
 ) => Promise<void>;
+const proxyHandler = (auth: ProxyAuth, request: ProxyRequest) => invokeProxy(request, { auth });
 
 describe("Next.js proxy authorization", () => {
   beforeEach(() => {

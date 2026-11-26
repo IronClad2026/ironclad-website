@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { CASTER_INVITATION_FRAME_POLICY } from "./lib/caster/invitation-policy";
 import { assertRealtimeStagingEnvironment } from "./lib/p03-1-preview-safety";
 
 assertRealtimeStagingEnvironment();
@@ -48,6 +49,13 @@ const nextConfig: NextConfig = {
             value:
               "camera=(), microphone=(), geolocation=(), payment=()",
           },
+        ],
+      },
+      {
+        source: "/casters/invitation",
+        headers: [
+          { key: "Referrer-Policy", value: "no-referrer" },
+          { key: "Content-Security-Policy", value: CASTER_INVITATION_FRAME_POLICY },
         ],
       },
       {

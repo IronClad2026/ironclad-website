@@ -1,3 +1,5 @@
+export { casterRouteAccess } from "@/lib/caster/routes";
+
 const PUBLIC_ROUTE_ROOTS = [
   "/sign-in",
   "/sign-up",

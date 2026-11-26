@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   Map,
   Megaphone,
+  Mic,
   Trophy,
   Vote,
   Wrench,
@@ -58,6 +59,12 @@ const ADMIN_NAVIGATION_GROUPS: AdminNavigationGroup[] = [
         href: "/admin/tournaments",
         icon: Trophy,
         label: "Tournaments",
+        match: "prefix",
+      },
+      {
+        href: "/admin/casters",
+        icon: Mic,
+        label: "Caster Management",
         match: "prefix",
       },
     ],
@@ -114,7 +121,9 @@ function isActiveRoute(
   return pathname === item.href || pathname.startsWith(`${item.href}/`);
 }
 
-export default function AdminSidebar({ showReadyUsage = false }: { showReadyUsage?: boolean }) {
+export default function AdminSidebar({ showReadyUsage = false, showCasterManagement = false }: {
+  showReadyUsage?: boolean; showCasterManagement?: boolean;
+}) {
   const pathname = usePathname() ?? "";
 
   return (
@@ -141,7 +150,7 @@ export default function AdminSidebar({ showReadyUsage = false }: { showReadyUsag
                   icon: ChartNoAxesCombined,
                   label: "Ready usage",
                   match: "exact" as const,
-                }] : group.items).map((item) => {
+                }] : group.items).filter((item) => showCasterManagement || item.href !== "/admin/casters").map((item) => {
                   const active = isActiveRoute(pathname, item);
                   const Icon = item.icon;
 
@@ -149,7 +158,7 @@ export default function AdminSidebar({ showReadyUsage = false }: { showReadyUsag
                     <li key={item.href}>
                       <Link
                         href={item.href}
-                        prefetch={item.href === "/admin/ready-usage" ? false : undefined}
+                        prefetch={["/admin/ready-usage", "/admin/casters"].includes(item.href) ? false : undefined}
                         aria-current={active ? "page" : undefined}
                         className={`flex min-h-11 items-center gap-3 rounded-lg border px-3 py-2 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-2 focus-visible:ring-offset-black ${
                           active

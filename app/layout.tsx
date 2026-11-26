@@ -16,7 +16,11 @@ import AccountLegalUpdateGate from "@/components/legal/AccountLegalUpdateGate";
 import SiteMusicPlayer from "@/components/SiteMusicPlayer";
 import SmoothScrollProvider from "@/components/SmoothScrollProvider";
 import { loadAccountLegalRuntimeState } from "@/lib/account-legal-acceptance";
+import { isCasterProgramEnabled } from "@/lib/caster/environment";
+import { readCasterLayoutContext } from "@/lib/caster/layout-context";
+import { CASTER_LAYOUT_HEADER } from "@/lib/caster/routes";
 import { loadClerkLocalization } from "@/lib/i18n/clerk";
+import type { Locale } from "@/lib/i18n/config";
 import { loadDictionary } from "@/lib/i18n/loaders";
 import { getRequestLocale } from "@/lib/i18n/request";
 import { getLegalDocument } from "@/lib/legal-corpus-publication";
@@ -84,9 +88,20 @@ export default async function RootLayout({
   children: ReactNode;
 }>) {
   const locale = await getRequestLocale();
+  const requestHeaders = await headers();
+  const casterLayout = isCasterProgramEnabled() ? readCasterLayoutContext(requestHeaders.get(CASTER_LAYOUT_HEADER)) : null;
+
+  if (casterLayout) {
+    return (
+      <CasterJourneyLayout locale={locale} view={casterLayout.view} legalError={casterLayout.legalError}>
+        {children}
+      </CasterJourneyLayout>
+    );
+  }
+
   // Proxy discards incoming copies of this header before assigning either
   // layout. No private navbar/badge queries run in the access-only layout.
-  if (isPublicProfileNoticeInstalled() && (await headers()).get(NOTICE_LAYOUT_HEADER)) {
+  if (isPublicProfileNoticeInstalled() && requestHeaders.get(NOTICE_LAYOUT_HEADER)) {
     return (
       <ClerkProvider localization={await loadClerkLocalization(locale)}>
         <html lang={locale}>
@@ -136,6 +151,34 @@ export default async function RootLayout({
                 <SiteMusicPlayer />
               </SmoothScrollProvider>
             </AccountLegalUpdateGate>
+          </LocaleProvider>
+        </body>
+      </html>
+    </ClerkProvider>
+  );
+}
+
+async function CasterJourneyLayout({ locale, view, legalError, children }: {
+  locale: Locale;
+  view: "auth" | "studio";
+  legalError: string | null;
+  children: ReactNode;
+}) {
+  const [clerkLocalization, common] = await Promise.all([
+    loadClerkLocalization(locale),
+    loadDictionary(locale, "common"),
+  ]);
+  const formError = legalError === "required" ? "acceptance-required" : legalError === "retry" ? "unavailable" : undefined;
+  return (
+    <ClerkProvider localization={clerkLocalization}>
+      <html lang={locale}>
+        <body>
+          <LocaleProvider locale={locale} dictionaries={{ common }}>
+            {view === "auth" ? children : (
+              <AccountLegalUpdateGate copy={common.legalUpdate} casterSubmission formError={formError}>
+                {children}
+              </AccountLegalUpdateGate>
+            )}
           </LocaleProvider>
         </body>
       </html>
