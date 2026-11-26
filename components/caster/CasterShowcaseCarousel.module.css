@@ -1,0 +1,14 @@
+.slide {
+  touch-action: pan-y pinch-zoom;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .slide [data-caster-slide-content="true"] {
+    animation: reveal-caster 220ms ease-out both;
+  }
+}
+
+@keyframes reveal-caster {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}

@@ -54,6 +54,12 @@ const nextConfig: NextConfig = {
         ],
       },
       {
+        source: "/casters/:slug",
+        headers: [
+          { key: "Content-Security-Policy", value: "frame-ancestors 'none'; base-uri 'self'; object-src 'none'; frame-src 'self' https://www.youtube-nocookie.com https://player.twitch.tv https://clips.twitch.tv" },
+        ],
+      },
+      {
         source: "/casters/invitation",
         headers: [
           { key: "Referrer-Policy", value: "no-referrer" },

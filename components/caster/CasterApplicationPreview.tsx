@@ -14,10 +14,12 @@ export default function CasterApplicationPreview({
   data,
   copy = getCasterApplicationCopy("en"),
   approved = false,
+  publicCountry,
 }: {
   data: CasterApplicationDraft;
   copy?: CasterApplicationCopy;
   approved?: boolean;
+  publicCountry?: string;
 }) {
   const links = data.links.flatMap(({ label, url }) => {
     const href = httpsUrl(url);
@@ -49,6 +51,7 @@ export default function CasterApplicationPreview({
             {approved ? <p className="mb-1 text-xs font-black text-orange-300">{copy.preview.designation}</p> : null}
             <h3 className="text-2xl leading-tight font-black [overflow-wrap:anywhere] sm:text-4xl">{data.displayName.trim() || copy.preview.name}</h3>
             {data.languages.length ? <p className="mt-2 text-sm text-zinc-300 [overflow-wrap:anywhere]">{data.languages.join(" · ")}</p> : null}
+            {publicCountry ? <p className="mt-1 text-sm text-zinc-300 [overflow-wrap:anywhere]">{publicCountry}</p> : null}
           </div>
         </div>
       </header>

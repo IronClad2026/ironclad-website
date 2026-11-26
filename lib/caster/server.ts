@@ -56,6 +56,19 @@ export async function casterRpc<T>(name: string, args: Record<string, unknown>):
   }
 }
 
+export async function canOpenCasterStudioFromNavigation() {
+  try {
+    const { userId, sessionId } = await auth();
+    if (!userId || !sessionId) return false;
+    const result = await casterRpc<{ status: string; application: { id: string } | null }>(
+      "caster_phase1_get_application", { p_actor: userId },
+    );
+    return result?.status === "open" && Boolean(result.application?.id);
+  } catch {
+    return false;
+  }
+}
+
 type CurrentCasterAccount =
   | { status: "open"; id: string; email: string | null; emailVerified: boolean }
   | { status: "signed_out" | "closed" | "unavailable" };

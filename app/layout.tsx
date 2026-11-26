@@ -17,7 +17,10 @@ import SiteMusicPlayer from "@/components/SiteMusicPlayer";
 import SmoothScrollProvider from "@/components/SmoothScrollProvider";
 import { loadAccountLegalRuntimeState } from "@/lib/account-legal-acceptance";
 import { isCasterProgramEnabled } from "@/lib/caster/environment";
+import { getCasterProfileCopy } from "@/lib/caster/profile-copy";
+import { getPublicCasterCopy } from "@/lib/caster/public-copy";
 import { CASTER_CHROME_HEADER } from "@/lib/caster/routes";
+import { canOpenCasterStudioFromNavigation } from "@/lib/caster/server";
 import { loadClerkLocalization } from "@/lib/i18n/clerk";
 import { loadDictionary } from "@/lib/i18n/loaders";
 import { getRequestLocale } from "@/lib/i18n/request";
@@ -87,7 +90,8 @@ export default async function RootLayout({
 }>) {
   const locale = await getRequestLocale();
   const requestHeaders = await headers();
-  const casterDocument = isCasterProgramEnabled() && requestHeaders.get(CASTER_CHROME_HEADER) === "bare";
+  const casterEnabled = isCasterProgramEnabled();
+  const casterDocument = casterEnabled && requestHeaders.get(CASTER_CHROME_HEADER) === "bare";
   const noticeDocument = isPublicProfileNoticeInstalled() && requestHeaders.get(NOTICE_LAYOUT_HEADER);
   // These access documents own their content and checks. The proxy's chrome
   // marker only keeps the standard shell and its private queries out of them.
@@ -112,6 +116,11 @@ export default async function RootLayout({
   const ppa = getLegalDocument("ppa");
   const analyticsConsentAvailable =
     isVercelProduction && legalRuntime.analyticsAvailable;
+  const casterNavigation = casterEnabled ? {
+    directoryLabel: getPublicCasterCopy(locale).directory,
+    studioLabel: legalRuntime.accountGate.status === "satisfied" && await canOpenCasterStudioFromNavigation()
+      ? getCasterProfileCopy(locale).title : undefined,
+  } : undefined;
 
   return (
     <ClerkProvider localization={clerkLocalization}>
@@ -125,7 +134,10 @@ export default async function RootLayout({
             >
               <SmoothScrollProvider>
                 <GlobalSmoke />
-                <Navbar ready={isReadyStagingEnabled() ? <ReadyHeader wardrobePilotEnabled={isReadyWardrobePilotEnabled()} /> : undefined} />
+                <Navbar
+                  ready={isReadyStagingEnabled() ? <ReadyHeader wardrobePilotEnabled={isReadyWardrobePilotEnabled()} /> : undefined}
+                  casters={casterNavigation}
+                />
 
                 <div>{children}</div>
 

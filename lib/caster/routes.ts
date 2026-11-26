@@ -1,4 +1,5 @@
 import { CASTER_APPLICATION_PATH, CASTER_MEDIA_PATH, isCasterMediaId } from "./application";
+import { CASTER_DIRECTORY_PATH, CASTER_PROFILE_PATH, CASTER_PUBLIC_MEDIA_PATH, isCasterPublicSlug } from "./publication";
 
 export const CASTER_INVITATION_PATH = "/casters/invitation";
 export const CASTER_STUDIO_PATH = "/caster-studio";
@@ -40,13 +41,23 @@ export function casterRouteAccess(pathname: string, method: string, enabled: boo
   if (method === "GET" || method === "HEAD") {
     if (pathname === CASTER_STUDIO_PATH) return "studio";
     if (CLERK_AUTH_PATHS.has(pathname)) return "auth";
+    if (pathname === CASTER_DIRECTORY_PATH ||
+      (pathname.startsWith(`${CASTER_DIRECTORY_PATH}/`) && isCasterPublicSlug(pathname.slice(CASTER_DIRECTORY_PATH.length + 1)))) {
+      return "public-page";
+    }
+    if (pathname.startsWith(`${CASTER_PUBLIC_MEDIA_PATH}/`)) {
+      const parts = pathname.slice(CASTER_PUBLIC_MEDIA_PATH.length + 1).split("/");
+      if (parts.length === 3 && isCasterPublicSlug(parts[0]) && isCasterMediaId(parts[1]) && isCasterMediaId(parts[2])) {
+        return "public-media";
+      }
+    }
     if (pathname.startsWith(`${CASTER_MEDIA_PATH}/`) && isCasterMediaId(pathname.slice(CASTER_MEDIA_PATH.length + 1))) {
       return "protected-api";
     }
   }
   if (method === "POST") {
     if (pathname === CASTER_CLAIM_PATH || pathname === CASTER_LEGAL_PATH || pathname === CASTER_SIGN_OUT_PATH ||
-      pathname === CASTER_APPLICATION_PATH || pathname === CASTER_MEDIA_PATH) {
+      pathname === CASTER_APPLICATION_PATH || pathname === CASTER_MEDIA_PATH || pathname === CASTER_PROFILE_PATH) {
       return "protected-api";
     }
   }

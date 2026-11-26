@@ -1,4 +1,5 @@
 import HomeAccountSection from "@/components/HomeAccountSection";
+import CasterShowcaseSection from "@/components/caster/CasterShowcaseSection";
 import LatestNewsSection from "@/components/news/LatestNewsSection";
 import { Suspense } from "react";
 import ScrollReveal from "@/components/ScrollReveal";
@@ -98,6 +99,9 @@ export default async function Home() {
       <CompetitionPathSection copy={copy} />
       <Suspense fallback={null}>
         <LatestNewsSection copy={copy.news} locale={locale} />
+      </Suspense>
+      <Suspense fallback={null}>
+        <CasterShowcaseSection locale={locale} />
       </Suspense>
     </main>
   );

@@ -9,6 +9,8 @@ import { getCasterApplicationCopy } from "@/lib/caster/application-copy";
 import { CASTER_SIGN_IN_PATH, CASTER_STUDIO_PATH, INVITATION_PATH } from "@/lib/caster/contracts";
 import { isCasterProgramEnabled } from "@/lib/caster/environment";
 import { CONTINUATION_COOKIE, readContinuationDigest } from "@/lib/caster/invitation-secret";
+import { getCasterProfileCopy } from "@/lib/caster/profile-copy";
+import type { CasterWorkingResult } from "@/lib/caster/publication";
 import { CASTER_SIGN_OUT_PATH } from "@/lib/caster/routes";
 import { casterRpc, loadCurrentCasterAccount } from "@/lib/caster/server";
 import { getCasterStudioCopy } from "@/lib/caster/studio-copy";
@@ -20,7 +22,7 @@ import CasterApplicationEditor from "./CasterApplicationEditor";
 import CasterStudioLegalGate from "./CasterStudioLegalGate";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Caster application · IronClad", robots: { index: false, follow: false }, referrer: "same-origin" };
+export const metadata: Metadata = { title: "Caster Studio · IronClad", robots: { index: false, follow: false }, referrer: "same-origin" };
 
 const button = "inline-flex min-h-12 items-center justify-center border px-5 py-3 text-sm font-black focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300";
 const primary = `${button} border-orange-400 bg-orange-500 text-black hover:bg-orange-300`;
@@ -46,12 +48,17 @@ async function CasterStudioContent({ locale, claimStatus, signOutFailed }: {
   const account = await loadCurrentCasterAccount();
   if (account.status === "signed_out") redirect(CASTER_SIGN_IN_PATH);
 
-  const jar = await cookies();
   const copy = getCasterStudioCopy(locale);
-  const snapshot = account.status === "open"
-    ? await casterRpc<CasterApplicationResult>("caster_phase2_get", { p_actor: account.id })
-    : null;
+  const [jar, snapshot] = await Promise.all([
+    cookies(),
+    account.status === "open" ? casterRpc<CasterApplicationResult>("caster_phase2_get", { p_actor: account.id }) : null,
+  ]);
   const application = snapshot?.status === "ok" ? snapshot.application : null;
+  const isApproved = application?.status === "approved";
+  const profileCopy = getCasterProfileCopy(locale);
+  const ownerResult = isApproved && account.status === "open" && account.emailVerified
+    ? await casterRpc<CasterWorkingResult>("caster_phase3_owner", { p_actor: account.id }) : null;
+  const workingProfile = ownerResult?.status === "ok" ? ownerResult.profile : null;
   const continuationDigest = readContinuationDigest(jar.get(CONTINUATION_COOKIE)?.value);
   const continuation = snapshot?.status === "not_found" && continuationDigest
     ? await casterRpc<{ status: string }>("caster_phase1_get_continuation", { p_continuation_digest: continuationDigest })
@@ -63,18 +70,21 @@ async function CasterStudioContent({ locale, claimStatus, signOutFailed }: {
     <main className="mx-auto min-h-svh max-w-3xl px-5 py-16 text-white sm:px-8">
       <section id="application" className="border border-white/10 border-t-orange-500 bg-zinc-950 px-4 py-8 min-[400px]:px-6 sm:px-10 sm:py-12">
         <p className="mb-3 text-sm font-black uppercase text-orange-300">{copy.programme}</p>
-        <h1 className="mb-6 text-3xl font-black sm:text-4xl">{copy.title}</h1>
+        <h1 className="mb-6 text-3xl font-black sm:text-4xl">{isApproved ? profileCopy.title : copy.title}</h1>
         {application && account.status === "open" ? (
           account.emailVerified && account.email ? (
             <>
-              <CasterApplicationEditor
-                initial={application}
-                copy={getCasterApplicationCopy(locale)}
-                locale={toIntlLocale(locale)}
-                email={account.email}
-                countries={getCountryOptions(locale)}
-                retryLabel={copy.retry}
-              />
+              {isApproved && !workingProfile ? <p role="alert" className="text-orange-200">{copy.unavailable}</p> : (
+                <CasterApplicationEditor
+                  initial={application}
+                  copy={getCasterApplicationCopy(locale)}
+                  locale={toIntlLocale(locale)}
+                  email={account.email}
+                  countries={getCountryOptions(locale)}
+                  retryLabel={copy.retry}
+                  profile={workingProfile ? { initial: workingProfile, copy: profileCopy } : undefined}
+                />
+              )}
               <Suspense fallback={null}>
                 <CasterApplicationNotifications actor={account.id} locale={locale} />
               </Suspense>

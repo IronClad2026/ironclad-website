@@ -1,9 +1,10 @@
 import {
-  getAnnouncementPlainText, hasAnnouncementDocumentText, normalizeAnnouncementHref, parseAnnouncementDocument,
+  getAnnouncementPlainText, hasAnnouncementDocumentText, parseAnnouncementDocument,
   type AnnouncementBlockNode, type AnnouncementDocument,
 } from "@/lib/announcement-document";
 import { countries, getCountryPresentationCode } from "@/lib/countries";
 import { CASTER_APPLICATION_LIMITS as limits, emptyCasterDraft, isCasterMediaId, type CasterApplicationDraft } from "./application";
+import { parseCasterFeaturedVideo, parseCasterHttpsUrl } from "./featured-video";
 
 const countryCodes = new Set(countries.map(getCountryPresentationCode));
 const draftFields = Object.keys(emptyCasterDraft());
@@ -24,31 +25,6 @@ function labels(value: unknown, max: number) {
   const result = value.map((item) => text(item, 50));
   if (result.some((item) => !item)) return null;
   return Array.from(new Set(result as string[]));
-}
-
-function httpsUrl(value: unknown): URL | null {
-  const normalized = normalizeAnnouncementHref(value);
-  if (!normalized?.startsWith("https://")) return null;
-  const url = new URL(normalized);
-  return url.port || !url.hostname.includes(".") || url.hostname.endsWith(".local") ? null : url;
-}
-
-function featuredVideo(value: unknown): string | null {
-  const url = httpsUrl(value);
-  if (!url) return null;
-  if (["youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be"].includes(url.hostname)) {
-    const id = url.hostname === "youtu.be" ? url.pathname.slice(1)
-      : url.pathname === "/watch" ? url.searchParams.get("v")
-      : /^\/(?:shorts|live|embed)\/([^/]+)$/.exec(url.pathname)?.[1];
-    return id && /^[A-Za-z0-9_-]{11}$/.test(id) ? `https://www.youtube.com/watch?v=${id}` : null;
-  }
-  if (["twitch.tv", "www.twitch.tv", "m.twitch.tv"].includes(url.hostname) && /^\/videos\/\d{1,24}$/.test(url.pathname)) {
-    return `https://www.twitch.tv${url.pathname}`;
-  }
-  if (url.hostname === "clips.twitch.tv" && /^\/[A-Za-z0-9_-]{1,120}$/.test(url.pathname)) {
-    return `https://clips.twitch.tv${url.pathname}`;
-  }
-  return null;
 }
 
 function biographyContainsLinks(block: AnnouncementBlockNode): boolean {
@@ -88,11 +64,11 @@ export function parseCasterDraft(value: unknown): CasterApplicationDraft | null 
   for (const link of value.links) {
     if (!record(link) || Object.keys(link).length !== 2) return null;
     const label = text(link.label, 60);
-    const url = httpsUrl(link.url);
+    const url = parseCasterHttpsUrl(link.url);
     if (!label || !url) return null;
     links.push({ label, url: url.href });
   }
-  const videos = value.videos.map(featuredVideo);
+  const videos = value.videos.map((url) => parseCasterFeaturedVideo(url)?.watchUrl ?? null);
   if (videos.some((url) => url === null)) return null;
 
   return {

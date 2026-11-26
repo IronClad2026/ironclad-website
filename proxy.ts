@@ -51,7 +51,9 @@ const authenticatedProxy = clerkMiddleware(async (auth, request) => {
       requestHeaders.set(CASTER_CHROME_HEADER, "bare");
     }
     const response = NextResponse.next({ request: { headers: requestHeaders } });
-    if (casterAccess === "studio") response.headers.set("Cache-Control", "private, no-store");
+    if (casterAccess === "studio" || casterAccess === "public-page" || casterAccess === "public-media") {
+      response.headers.set("Cache-Control", "private, no-store");
+    }
     return response;
   }
 

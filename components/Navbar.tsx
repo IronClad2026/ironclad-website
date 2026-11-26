@@ -29,6 +29,7 @@ import englishCommon from "@/lib/i18n/dictionaries/en/common";
 import { translate } from "@/lib/i18n/translate";
 import type { MessageValues } from "@/lib/i18n/types";
 import { OFFICIAL_DISCORD_SUPPORT_CHANNEL_URL } from "@/lib/support";
+import { CASTER_DIRECTORY_PATH } from "@/lib/caster/publication";
 
 type CustomClaims = {
   metadata?: {
@@ -108,11 +109,13 @@ function NavbarAccountControl({
   isSignedIn,
   signInLabel,
   onSignIn,
+  studioLabel,
 }: {
   isLoaded: boolean;
   isSignedIn: boolean;
   signInLabel: string;
   onSignIn?: () => void;
+  studioLabel?: string;
 }) {
   if (!isLoaded) {
     return (
@@ -126,7 +129,7 @@ function NavbarAccountControl({
   if (isSignedIn) {
     return (
       <div className="inline-flex h-11 w-11 shrink-0 items-center justify-center">
-        <IronCladUserButton />
+        <IronCladUserButton studioLabel={studioLabel} />
       </div>
     );
   }
@@ -143,7 +146,7 @@ function NavbarAccountControl({
   );
 }
 
-export default function Navbar({ ready }: { ready?: ReactNode }) {
+export default function Navbar({ ready, casters }: { ready?: ReactNode; casters?: { directoryLabel: string; studioLabel?: string } }) {
   const [isOpen, setIsOpen] = useState(false);
   const [languageOpen, setLanguageOpen] = useState(false);
   const pathname = usePathname();
@@ -384,6 +387,7 @@ export default function Navbar({ ready }: { ready?: ReactNode }) {
                 label={t("nav.more")}
                 aboutLabel={t("nav.about")}
                 active={isActiveRoute(pathname, "/about")}
+                casters={casters ? { label: casters.directoryLabel, active: isActiveRoute(pathname, CASTER_DIRECTORY_PATH) } : undefined}
               />
             </div>
           </div>
@@ -424,6 +428,7 @@ export default function Navbar({ ready }: { ready?: ReactNode }) {
                 isLoaded={isLoaded}
                 isSignedIn={isSignedIn === true}
                 signInLabel={t("nav.signIn")}
+                studioLabel={casters?.studioLabel}
               />
             </div>
             <div className="shrink-0 border-l border-white/10 pl-2 min-[1800px]:pl-3">
@@ -522,6 +527,13 @@ export default function Navbar({ ready }: { ready?: ReactNode }) {
                 >
                   {t("nav.about")}
                 </Link>
+                {casters && (
+                  <Link href={CASTER_DIRECTORY_PATH} onClick={() => setIsOpen(false)}
+                    className={mobileNavLinkClass(isActiveRoute(pathname, CASTER_DIRECTORY_PATH))}
+                    aria-current={isActiveRoute(pathname, CASTER_DIRECTORY_PATH) ? "page" : undefined}>
+                    {casters.directoryLabel}
+                  </Link>
+                )}
               </section>
               {accountNavItems.length > 0 ? (
                 <section aria-labelledby="mobile-account-label" className="border-t border-white/10 pt-3">
@@ -561,6 +573,7 @@ export default function Navbar({ ready }: { ready?: ReactNode }) {
                   isLoaded={isLoaded}
                   isSignedIn={isSignedIn === true}
                   signInLabel={t("nav.signIn")}
+                  studioLabel={casters?.studioLabel}
                   onSignIn={() => setIsOpen(false)}
                 />
               </div>
