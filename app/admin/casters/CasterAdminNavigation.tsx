@@ -2,12 +2,14 @@ import Link from "next/link";
 import { CASTER_ADMIN_PATH } from "@/lib/caster/contracts";
 import { CASTER_APPLICATIONS_ADMIN_PATH, CASTER_GRANTS_ADMIN_PATH } from "./admin-application-contracts";
 import { CASTER_MODERATION_PATH } from "./moderation-contracts";
+import { CASTER_COVERAGE_ADMIN_PATH } from "./coverage/contracts";
 
 const sections = [
   { key: "invitations", href: CASTER_ADMIN_PATH, label: "Invitations" },
   { key: "applications", href: CASTER_APPLICATIONS_ADMIN_PATH, label: "Applications" },
   { key: "grants", href: CASTER_GRANTS_ADMIN_PATH, label: "Grant caster access" },
   { key: "moderation", href: CASTER_MODERATION_PATH, label: "Moderation" },
+  { key: "coverage", href: CASTER_COVERAGE_ADMIN_PATH, label: "Casting coverage" },
 ] as const;
 
 export default function CasterAdminNavigation({ current }: { current: (typeof sections)[number]["key"] }) {

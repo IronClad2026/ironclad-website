@@ -2,8 +2,10 @@ import { ArrowLeft, ArrowUpRight, Globe2, MapPin, Mic2 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import AnnouncementBody from "@/components/AnnouncementBody";
+import { CasterCoverageList } from "@/components/caster/CasterCoverage";
 import CasterFeaturedPlayers from "@/components/caster/CasterFeaturedPlayers";
 import { PublicCasterAvatar } from "@/components/caster/PublicCasterCard";
+import type { CasterCoverageAssignment } from "@/lib/caster/coverage";
 import { parseCasterFeaturedVideo, parseCasterHttpsUrl } from "@/lib/caster/featured-video";
 import type { PublicCasterCopy } from "@/lib/caster/public-copy";
 import { CASTER_DIRECTORY_PATH, casterPublicMediaPath, type PublicCasterProfile } from "@/lib/caster/publication";
@@ -12,10 +14,11 @@ import { formatRegionName } from "@/lib/i18n/format";
 
 const contentPanel = "min-w-0 border border-white/15 bg-zinc-950/80 p-5 sm:p-7";
 
-export default function PublicCasterProfileView({ caster, copy, locale }: {
+export default function PublicCasterProfileView({ caster, copy, locale, coverage = [] }: {
   caster: PublicCasterProfile;
   copy: PublicCasterCopy;
   locale: Locale;
+  coverage?: readonly CasterCoverageAssignment[];
 }) {
   const media = (id: string) => casterPublicMediaPath(caster.slug, caster.publication_id, id);
   const videos = caster.videos.flatMap((url) => {
@@ -86,6 +89,7 @@ export default function PublicCasterProfileView({ caster, copy, locale }: {
             </div>
           ) : null}
         </section>
+        <CasterCoverageList records={coverage} locale={locale} mode="history" />
         {links.length ? (
           <section aria-labelledby="caster-links" className={contentPanel}>
             <h2 id="caster-links" className="mb-3 text-xl font-black">{copy.links}</h2>

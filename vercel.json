@@ -4,8 +4,9 @@
   "git": {
     "deploymentEnabled": {
       "codex/caster-phase-1-invitations": false,
-      "codex/caster-phase-3-publication": false
+      "codex/caster-phase-3-publication": false,
+      "codex/caster-phase-4-coverage": false
     }
   },
-  "ignoreCommand": "node -e \"process.exit(['codex/ready-wardrobe-pilot', 'codex/ready-wardrobe-dashboard', 'codex/ready-wardrobe-catalogue', 'codex/caster-phase-1-invitations', 'codex/caster-phase-3-publication'].includes(process.env.VERCEL_GIT_COMMIT_REF) ? 0 : 1)\""
+  "ignoreCommand": "node -e \"process.exit(['codex/ready-wardrobe-pilot', 'codex/ready-wardrobe-dashboard', 'codex/ready-wardrobe-catalogue', 'codex/caster-phase-1-invitations', 'codex/caster-phase-3-publication', 'codex/caster-phase-4-coverage'].includes(process.env.VERCEL_GIT_COMMIT_REF) ? 0 : 1)\""
 }

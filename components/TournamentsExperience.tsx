@@ -1,6 +1,8 @@
 "use client";
 
 import { getDivisionForElo, requireDivisionModelVersion } from "@/lib/division-model";
+import type { CasterCoverageAssignment } from "@/lib/caster/coverage";
+import { getCasterCoverageCopy } from "@/lib/caster/coverage-copy";
 import {
   useCallback,
   useEffect,
@@ -36,6 +38,7 @@ import HydrationSafeLocalDateTime from "@/components/HydrationSafeLocalDateTime"
 import useHydrationSafeNow from "@/components/useHydrationSafeNow";
 import PublishedTournamentGallery from "@/components/tournaments/PublishedTournamentGallery";
 import TournamentMapPoolViewer from "@/components/tournaments/TournamentMapPoolViewer";
+import { DivisionCasterCoverage, MatchCasterCoverage } from "@/components/caster/CasterCoverage";
 import useBracketLayout from "@/components/tournaments/useBracketLayout";
 import useMatchRoomUnread from "@/components/tournaments/useMatchRoomUnread";
 import MatchRoomAttentionAction, { matchRoomAttentionClass } from "@/components/tournaments/MatchRoomAttentionAction";
@@ -853,6 +856,8 @@ function Overview({ tournament, tournaments, activePanel, setActivePanel, select
     item.id === tournament.id || getTournamentEventSection(item.divisionStates) !== "resolved"
   );
   const events = currentEvents.some((item) => item.id === tournament.id) ? currentEvents : [tournament, ...currentEvents];
+  const castingTab = tournament.casterCoverage?.some((record) => record.scope === "tournament") ? "media" : "brackets";
+  const castingHref = `/tournaments?${new URLSearchParams({ tournament: tournament.slug, tab: castingTab })}`;
   return <div className="space-y-6">
     <PublishedTournamentGallery
       key={tournament.id}
@@ -861,6 +866,12 @@ function Overview({ tournament, tournaments, activePanel, setActivePanel, select
       selectedContext={selectedContext}
       onSelect={onSelectTournament}
     />
+    {tournament.casterCoverage?.length ? (
+      <Link href={castingHref} prefetch={false}
+        className="inline-flex min-h-11 max-w-full items-center gap-2 border border-orange-400/30 bg-black/60 px-4 py-2 text-sm font-bold text-orange-300 hover:text-orange-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300">
+        <Radio size={16} aria-hidden="true" className="shrink-0" />{getCasterCoverageCopy(locale).coverage}
+      </Link>
+    ) : null}
     <section aria-label={t("tournaments.redesign.panelNavigation")} className="min-w-0 border border-white/12 bg-zinc-950/80 p-4 sm:p-5">
       <p className="mb-3 break-words text-xs font-semibold text-zinc-400">{t("tournaments.redesign.selectedEvent")} · {tournament.title}</p>
       <div role="tablist" aria-label={t("tournaments.redesign.panelNavigation")} className="flex flex-wrap gap-1 border-b border-white/10" onKeyDown={(event) => {
@@ -1201,6 +1212,7 @@ function Brackets({
         </StatusPill>
       </div>
       {tournament.brackets.map((bracket) => {
+        const coverage = tournament.casterCoverage?.filter((record) => record.scope === "tournament" || record.division_id === bracket.id);
         const divisionState = getTournamentDivisionStateForBracket(
           tournament,
           bracket.id
@@ -1301,12 +1313,14 @@ function Brackets({
             {completedWithoutChampion && (
               <NoChampionPresentation bracketName={bracket.name} />
             )}
+            {coverage?.length ? <DivisionCasterCoverage divisionId={bracket.id} records={coverage} locale={locale} /> : null}
             {!generated ? (
               <p className="mt-6 border border-white/12 p-8 text-center text-zinc-500">
                 {t("tournaments.brackets.empty")}
               </p>
             ) : generated.format === "round_robin" ? (
               <RoundRobinBracket
+                coverage={coverage?.length ? { divisionId: bracket.id, records: coverage } : undefined}
                 matches={generated.matches}
                 unreadByMatchId={unreadByMatchId}
                 viewerRegistrationIds={viewer.registrationIds}
@@ -1322,6 +1336,7 @@ function Brackets({
               />
             ) : (
               <SingleEliminationBracket
+                coverage={coverage?.length ? { divisionId: bracket.id, records: coverage } : undefined}
                 matches={generated.matches}
                 participantsById={participantsById}
                 adminReadOnly={terminalTournament}
@@ -1886,6 +1901,8 @@ function NoChampionPresentation({ bracketName }: { bracketName: string }) {
   );
 }
 
+type BracketCoverage = { divisionId: string; records: readonly CasterCoverageAssignment[] };
+
 export function SingleEliminationBracket({
   matches,
   participantsById,
@@ -1896,6 +1913,7 @@ export function SingleEliminationBracket({
   focusedMatchId,
   anchorPrefix,
   unreadByMatchId,
+  coverage,
 }: {
   matches: GeneratedTournamentMatch[];
   participantsById: Map<string, TournamentParticipant>;
@@ -1906,6 +1924,7 @@ export function SingleEliminationBracket({
   focusedMatchId: string | null;
   anchorPrefix: "match-desktop" | "match-mobile";
   unreadByMatchId?: MatchRoomUnreadMap;
+  coverage?: BracketCoverage;
 }) {
   const t = useOptionalTranslations("competition", competitionEnglish);
   const locale = useOptionalLocale();
@@ -2047,6 +2066,9 @@ export function SingleEliminationBracket({
                     roundIndex={roundIndex}
                     matchIndex={matchIndex}
                     adminReadOnly={adminReadOnly}
+                    coverage={coverage ? (
+                      <MatchCasterCoverage {...coverage} matchId={match.id} locale={locale} />
+                    ) : null}
                     onAdminSelect={
                       onAdminMatchSelect
                         ? () => onAdminMatchSelect(match)
@@ -2087,6 +2109,7 @@ function ModernBracketMatch({
   onAdminSelect,
   onPlayerSelect,
   unread,
+  coverage,
 }: {
   match: Match;
   deadlineMatch: GeneratedTournamentMatch;
@@ -2100,6 +2123,7 @@ function ModernBracketMatch({
   onAdminSelect?: () => void;
   onPlayerSelect?: () => void;
   unread?: MatchRoomUnreadItem;
+  coverage?: ReactNode;
 }) {
   const t = useOptionalTranslations("competition", competitionEnglish);
   const attention = onPlayerSelect && !adminReadOnly && match.status !== "complete" ? unread : undefined;
@@ -2175,6 +2199,7 @@ function ModernBracketMatch({
       {onPlayerSelect && (
         <MatchRoomAttentionAction onClick={onPlayerSelect} unread={attention} />
       )}
+      {coverage}
     </div>
   );
 }
@@ -2432,6 +2457,7 @@ export function RoundRobinBracket({
   onPlayerMatchSelect,
   viewerRegistrationIds = [],
   unreadByMatchId,
+  coverage,
 }: {
   matches: GeneratedTournamentMatch[];
   standings: TournamentCard["generatedBrackets"][number]["standings"];
@@ -2441,8 +2467,10 @@ export function RoundRobinBracket({
   onPlayerMatchSelect?: (match: GeneratedTournamentMatch) => void;
   viewerRegistrationIds?: string[];
   unreadByMatchId?: MatchRoomUnreadMap;
+  coverage?: BracketCoverage;
 }) {
   const t = useOptionalTranslations("competition", competitionEnglish);
+  const locale = useOptionalLocale();
 
   return (
     <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_340px]">
@@ -2452,6 +2480,8 @@ export function RoundRobinBracket({
             key={match.id}
             match={toDisplayMatch(match, participantsById)}
             matchId={match.id}
+            anchorId={`match-desktop-${match.id}`}
+            coverage={coverage ? <MatchCasterCoverage {...coverage} matchId={match.id} locale={locale} /> : null}
             unread={unreadByMatchId?.get(match.id)}
             onPlayerSelect={onPlayerMatchSelect && viewerRegistrationIds.some((registrationId) =>
               registrationId === match.playerOneRegistrationId || registrationId === match.playerTwoRegistrationId
@@ -2593,6 +2623,8 @@ function hasPrize(tournament: TournamentCard) {
 function MatchCard({
   match,
   matchId,
+  anchorId,
+  coverage,
   unread,
   onPlayerSelect,
   adminReadOnly,
@@ -2600,6 +2632,8 @@ function MatchCard({
 }: {
   match: Match;
   matchId?: string;
+  anchorId?: string;
+  coverage?: ReactNode;
   unread?: MatchRoomUnreadItem;
   onPlayerSelect?: () => void;
   adminReadOnly: boolean;
@@ -2638,6 +2672,7 @@ function MatchCard({
 
   return (
     <motion.div
+      id={anchorId}
       data-match-room-card={matchId}
       data-match-room-unread={attention?.unreadSource}
       whileHover={{ y: -4 }}
@@ -2655,6 +2690,7 @@ function MatchCard({
         card
       )}
       {onPlayerSelect && <MatchRoomAttentionAction onClick={onPlayerSelect} unread={attention} />}
+      {coverage}
     </motion.div>
   );
 }
@@ -4766,6 +4802,7 @@ function MobileBrackets({
       </div>
 
       {tournament.brackets.map((bracket) => {
+        const coverage = tournament.casterCoverage?.filter((record) => record.scope === "tournament" || record.division_id === bracket.id);
         const divisionState = getTournamentDivisionStateForBracket(
           tournament,
           bracket.id
@@ -4868,6 +4905,7 @@ function MobileBrackets({
             {completedWithoutChampion && (
               <NoChampionPresentation bracketName={bracket.name} />
             )}
+            {coverage?.length ? <DivisionCasterCoverage divisionId={bracket.id} records={coverage} locale={locale} /> : null}
 
             {!generated ? (
               <p className="mt-6 border border-white/12 p-6 text-center text-zinc-500">
@@ -4875,6 +4913,7 @@ function MobileBrackets({
               </p>
             ) : generated.format === "round_robin" ? (
               <MobileRoundRobinBracket
+                coverage={coverage?.length ? { divisionId: bracket.id, records: coverage } : undefined}
                 matches={generated.matches}
                 unreadByMatchId={unreadByMatchId}
                 viewerRegistrationIds={viewer.registrationIds}
@@ -4891,6 +4930,7 @@ function MobileBrackets({
             ) : (
               <div className="w-full max-w-full overflow-x-auto overscroll-x-contain">
                 <SingleEliminationBracket
+                  coverage={coverage?.length ? { divisionId: bracket.id, records: coverage } : undefined}
                   matches={generated.matches}
                   participantsById={participantsById}
                   adminReadOnly={terminalTournament}
@@ -4943,6 +4983,7 @@ export function MobileRoundRobinBracket({
   onPlayerMatchSelect,
   viewerRegistrationIds = [],
   unreadByMatchId,
+  coverage,
 }: {
   matches: GeneratedTournamentMatch[];
   standings: TournamentCard["generatedBrackets"][number]["standings"];
@@ -4952,8 +4993,10 @@ export function MobileRoundRobinBracket({
   onPlayerMatchSelect?: (match: GeneratedTournamentMatch) => void;
   viewerRegistrationIds?: string[];
   unreadByMatchId?: MatchRoomUnreadMap;
+  coverage?: BracketCoverage;
 }) {
   const t = useOptionalTranslations("competition", competitionEnglish);
+  const locale = useOptionalLocale();
 
   return (
     <div className="mt-6 grid w-full max-w-full min-w-0 gap-5">
@@ -4963,6 +5006,8 @@ export function MobileRoundRobinBracket({
             key={match.id}
             match={toDisplayMatch(match, participantsById)}
             matchId={match.id}
+            anchorId={`match-mobile-${match.id}`}
+            coverage={coverage ? <MatchCasterCoverage {...coverage} matchId={match.id} locale={locale} /> : null}
             unread={unreadByMatchId?.get(match.id)}
             onPlayerSelect={onPlayerMatchSelect && viewerRegistrationIds.some((registrationId) =>
               registrationId === match.playerOneRegistrationId || registrationId === match.playerTwoRegistrationId

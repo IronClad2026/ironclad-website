@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 import PublicCasterProfileView from "@/components/caster/PublicCasterProfileView";
+import { loadPublicCasterHistory } from "@/lib/caster/coverage-server";
 import { isCasterProgramEnabled } from "@/lib/caster/environment";
 import { getPublicCasterCopy } from "@/lib/caster/public-copy";
 import { loadPublicCasterProfile } from "@/lib/caster/public-directory";
@@ -34,6 +35,7 @@ export default async function CasterProfilePage({ params }: Props) {
   const { slug } = await params;
   const [locale, caster] = await Promise.all([getRequestLocale(), loadCasterForRequest(slug)]);
   if (!caster) notFound();
+  const coverage = await loadPublicCasterHistory(slug);
 
-  return <PublicCasterProfileView caster={caster} locale={locale} copy={getPublicCasterCopy(locale)} />;
+  return <PublicCasterProfileView caster={caster} locale={locale} copy={getPublicCasterCopy(locale)} coverage={coverage} />;
 }

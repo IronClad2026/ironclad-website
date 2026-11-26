@@ -4,9 +4,12 @@ import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import CasterApplicationNotifications from "@/components/caster/CasterApplicationNotifications";
+import { CasterCoverageList } from "@/components/caster/CasterCoverage";
 import type { CasterApplicationResult } from "@/lib/caster/application";
 import { getCasterApplicationCopy } from "@/lib/caster/application-copy";
 import { CASTER_SIGN_IN_PATH, CASTER_STUDIO_PATH, INVITATION_PATH } from "@/lib/caster/contracts";
+import { getCasterCoverageCopy } from "@/lib/caster/coverage-copy";
+import { loadCasterAssignments } from "@/lib/caster/coverage-server";
 import { isCasterProgramEnabled } from "@/lib/caster/environment";
 import { CONTINUATION_COOKIE, readContinuationDigest } from "@/lib/caster/invitation-secret";
 import { getCasterProfileCopy } from "@/lib/caster/profile-copy";
@@ -59,6 +62,7 @@ async function CasterStudioContent({ locale, claimStatus, signOutFailed }: {
   const ownerResult = isApproved && account.status === "open" && account.emailVerified
     ? await casterRpc<CasterWorkingResult>("caster_phase3_owner", { p_actor: account.id }) : null;
   const workingProfile = ownerResult?.status === "ok" ? ownerResult.profile : null;
+  const showAssignments = workingProfile?.membership_status === "active";
   const continuationDigest = readContinuationDigest(jar.get(CONTINUATION_COOKIE)?.value);
   const continuation = snapshot?.status === "not_found" && continuationDigest
     ? await casterRpc<{ status: string }>("caster_phase1_get_continuation", { p_continuation_digest: continuationDigest })
@@ -71,6 +75,11 @@ async function CasterStudioContent({ locale, claimStatus, signOutFailed }: {
       <section id="application" className="border border-white/10 border-t-orange-500 bg-zinc-950 px-4 py-8 min-[400px]:px-6 sm:px-10 sm:py-12">
         <p className="mb-3 text-sm font-black uppercase text-orange-300">{copy.programme}</p>
         <h1 className="mb-6 text-3xl font-black sm:text-4xl">{isApproved ? profileCopy.title : copy.title}</h1>
+        {showAssignments && (
+          <a href="#casting-assignments" className="mb-4 inline-flex min-h-11 items-center text-sm font-bold text-orange-200 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300">
+            {getCasterCoverageCopy(locale).studioTitle}
+          </a>
+        )}
         {application && account.status === "open" ? (
           account.emailVerified && account.email ? (
             <>
@@ -132,8 +141,20 @@ async function CasterStudioContent({ locale, claimStatus, signOutFailed }: {
           {VERIFIED_DISCORD_TICKET_URL && <a className="min-h-12 px-2 py-3 text-orange-200 underline" href={VERIFIED_DISCORD_TICKET_URL} rel="noreferrer">{copy.support}</a>}
         </div>
       </section>
+      {showAssignments && account.status === "open" && (
+        <div id="casting-assignments" className="mt-5 scroll-mt-6">
+          <Suspense fallback={null}>
+            <StudioAssignments actor={account.id} locale={locale} />
+          </Suspense>
+        </div>
+      )}
     </main>
   );
+}
+
+async function StudioAssignments({ actor, locale }: { actor: string; locale: Locale }) {
+  const assignments = await loadCasterAssignments(actor);
+  return <CasterCoverageList records={assignments ?? []} locale={locale} mode="studio" unavailable={assignments === null} />;
 }
 
 function getCountryOptions(locale: Locale) {

@@ -9,14 +9,16 @@ const platformNames = {
   tiktok: "TikTok", x: "X",
 };
 
-export function PublicCasterAvatar({ caster, large = false }: { caster: Caster; large?: boolean }) {
+type AvatarSource = Pick<Caster, "slug" | "publication_id"> & { avatar: string | null };
+
+export function PublicCasterAvatar({ caster, large = false, compact = false }: { caster: AvatarSource; large?: boolean; compact?: boolean }) {
   return (
-    <span aria-hidden="true" className={`relative grid shrink-0 place-items-center overflow-hidden border border-orange-400/35 bg-zinc-900 text-orange-300 ${large ? "size-20 sm:size-28" : "size-16"}`}>
-      <UserRound size={large ? 32 : 26} />
+    <span aria-hidden="true" className={`relative grid shrink-0 place-items-center overflow-hidden border border-orange-400/35 bg-zinc-900 text-orange-300 ${large ? "size-20 sm:size-28" : compact ? "size-10" : "size-16"}`}>
+      <UserRound size={large ? 32 : compact ? 18 : 26} />
       {caster.avatar ? (
         <Image
           unoptimized fill src={casterPublicMediaPath(caster.slug, caster.publication_id, caster.avatar)} alt=""
-          sizes={large ? "(min-width: 640px) 112px, 80px" : "64px"} className="object-cover"
+          sizes={large ? "(min-width: 640px) 112px, 80px" : compact ? "40px" : "64px"} className="object-cover"
         />
       ) : null}
     </span>
