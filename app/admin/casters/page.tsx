@@ -24,7 +24,7 @@ export default async function CasterManagement({ searchParams }: { searchParams:
     invitations: CasterInvitation[]; events: CasterInvitationEvent[]; has_more_invitations: boolean; has_more_events: boolean;
   }>("caster_phase1_admin_snapshot", { p_actor: actor, p_offset: (page - 1) * 100 });
   if (!snapshot) {
-    return <main className="px-5 pb-10 pt-28 text-white"><h1 className="text-3xl font-bold">Caster Management</h1>
+    return <main className="min-h-svh bg-black px-5 pb-10 pt-28 text-white"><h1 className="text-3xl font-bold">Caster Management</h1>
       <p className="mt-4" role="alert">Invitations are temporarily unavailable. Reload this page to retry.</p></main>;
   }
 
