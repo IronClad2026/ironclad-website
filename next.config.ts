@@ -1,8 +1,10 @@
 import type { NextConfig } from "next";
+import { assertCasterFeaturePreviewBuildEnvironment } from "./lib/caster/environment";
 import { CASTER_INVITATION_FRAME_POLICY } from "./lib/caster/invitation-policy";
 import { assertRealtimeStagingEnvironment } from "./lib/p03-1-preview-safety";
 
 assertRealtimeStagingEnvironment();
+assertCasterFeaturePreviewBuildEnvironment();
 
 const nextConfig: NextConfig = {
   async headers() {
