@@ -31,12 +31,6 @@ function hasStagingServiceRole(key: string): boolean {
   }
 }
 
-function hasContinuationKey(value: string | undefined): boolean {
-  if (!value || !/^[A-Za-z0-9_-]{43}$/.test(value)) return false;
-  const key = Buffer.from(value, "base64url");
-  return key.length === 32 && key.toString("base64url") === value;
-}
-
 export function assertCasterBuildEnvironment(environment: CasterEnvironment = process.env): void {
   if (environment.CASTER_PROGRAM_ENABLED === "true" && !getCasterInvitationOrigin(environment)) {
     throw new Error("Caster programme opt-in requires isolated local fixtures or verified canonical Staging.");
@@ -50,7 +44,7 @@ export function getCasterInvitationOrigin(environment: CasterEnvironment = proce
   const serviceRoleKey = environment.SUPABASE_SERVICE_ROLE_KEY;
   if (environment.CASTER_PROGRAM_ENABLED !== "true" || !supabase ||
     !publishableKey?.startsWith("pk_test_") || !environment.CLERK_SECRET_KEY?.startsWith("sk_test_") ||
-    !serviceRoleKey || !hasContinuationKey(environment.CASTER_CONTINUATION_KEY) ||
+    !serviceRoleKey ||
     environment.TRANSACTIONAL_EMAIL_MODE !== "disabled") return null;
 
   if (!environment.VERCEL_ENV && !environment.VERCEL) {

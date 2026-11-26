@@ -17,10 +17,8 @@ import SiteMusicPlayer from "@/components/SiteMusicPlayer";
 import SmoothScrollProvider from "@/components/SmoothScrollProvider";
 import { loadAccountLegalRuntimeState } from "@/lib/account-legal-acceptance";
 import { isCasterProgramEnabled } from "@/lib/caster/environment";
-import { readCasterLayoutContext } from "@/lib/caster/layout-context";
-import { CASTER_LAYOUT_HEADER } from "@/lib/caster/routes";
+import { CASTER_CHROME_HEADER } from "@/lib/caster/routes";
 import { loadClerkLocalization } from "@/lib/i18n/clerk";
-import type { Locale } from "@/lib/i18n/config";
 import { loadDictionary } from "@/lib/i18n/loaders";
 import { getRequestLocale } from "@/lib/i18n/request";
 import { getLegalDocument } from "@/lib/legal-corpus-publication";
@@ -89,19 +87,11 @@ export default async function RootLayout({
 }>) {
   const locale = await getRequestLocale();
   const requestHeaders = await headers();
-  const casterLayout = isCasterProgramEnabled() ? readCasterLayoutContext(requestHeaders.get(CASTER_LAYOUT_HEADER)) : null;
-
-  if (casterLayout) {
-    return (
-      <CasterJourneyLayout locale={locale} view={casterLayout.view} legalError={casterLayout.legalError}>
-        {children}
-      </CasterJourneyLayout>
-    );
-  }
-
-  // Proxy discards incoming copies of this header before assigning either
-  // layout. No private navbar/badge queries run in the access-only layout.
-  if (isPublicProfileNoticeInstalled() && requestHeaders.get(NOTICE_LAYOUT_HEADER)) {
+  const casterDocument = isCasterProgramEnabled() && requestHeaders.get(CASTER_CHROME_HEADER) === "bare";
+  const noticeDocument = isPublicProfileNoticeInstalled() && requestHeaders.get(NOTICE_LAYOUT_HEADER);
+  // These access documents own their content and checks. The proxy's chrome
+  // marker only keeps the standard shell and its private queries out of them.
+  if (casterDocument || noticeDocument) {
     return (
       <ClerkProvider localization={await loadClerkLocalization(locale)}>
         <html lang={locale}>
@@ -152,36 +142,6 @@ export default async function RootLayout({
               </SmoothScrollProvider>
             </AccountLegalUpdateGate>
           </LocaleProvider>
-        </body>
-      </html>
-    </ClerkProvider>
-  );
-}
-
-async function CasterJourneyLayout({ locale, view, legalError, children }: {
-  locale: Locale;
-  view: "auth" | "studio";
-  legalError: string | null;
-  children: ReactNode;
-}) {
-  const [clerkLocalization, common] = await Promise.all([
-    loadClerkLocalization(locale),
-    loadDictionary(locale, "common"),
-  ]);
-  const formError = legalError === "required" ? "acceptance-required" : legalError === "retry" ? "unavailable" : undefined;
-  return (
-    <ClerkProvider localization={clerkLocalization}>
-      <html lang={locale}>
-        <body>
-          <div className="min-h-svh bg-black text-white">
-            <LocaleProvider locale={locale} dictionaries={{ common }}>
-              {view === "auth" ? children : (
-                <AccountLegalUpdateGate copy={common.legalUpdate} casterSubmission formError={formError}>
-                  {children}
-                </AccountLegalUpdateGate>
-              )}
-            </LocaleProvider>
-          </div>
         </body>
       </html>
     </ClerkProvider>

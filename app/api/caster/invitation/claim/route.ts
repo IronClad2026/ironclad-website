@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { CASTER_STUDIO_PATH } from "@/lib/caster/contracts";
 import { getCasterInvitationOrigin, isCasterProgramEnabled } from "@/lib/caster/environment";
-import { CONTINUATION_COOKIE, readInvitationContinuation } from "@/lib/caster/invitation-secret";
+import { CONTINUATION_COOKIE, readContinuationDigest } from "@/lib/caster/invitation-secret";
 import { CASTER_COOKIE_OPTIONS, CASTER_PRIVATE_HEADERS, casterRpc, isCasterPostOrigin, loadCurrentCasterAccount, readSmallCasterBody } from "@/lib/caster/server";
 
 export async function POST(request: NextRequest) {
@@ -20,9 +20,9 @@ export async function POST(request: NextRequest) {
   if (form.get("account") !== account.id) return studio("account_changed");
   if (!account.emailVerified) return studio("unverified");
 
-  const digest = readInvitationContinuation(request.cookies.get(CONTINUATION_COOKIE)?.value);
+  const digest = readContinuationDigest(request.cookies.get(CONTINUATION_COOKIE)?.value);
   if (!digest) return studio("lost", true);
-  const result = await casterRpc<{ status: string }>("caster_phase1_claim", { p_actor: account.id, p_token_digest: digest });
+  const result = await casterRpc<{ status: string }>("caster_phase1_claim_continuation", { p_actor: account.id, p_continuation_digest: digest });
   switch (result?.status) {
     case "claimed":
     case "already_owned":

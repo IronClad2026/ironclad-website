@@ -1,12 +1,13 @@
+import { createHash } from "node:crypto";
 import { isIP } from "node:net";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { isCasterProgramEnabled } from "@/lib/caster/environment";
-import { CONTINUATION_COOKIE, createInvitationContinuation, digestInvitationSecret, invitationRateKey, isInvitationSecret } from "@/lib/caster/invitation-secret";
+import { CONTINUATION_COOKIE, CONTINUATION_MAX_AGE_SECONDS, digestInvitationSecret, generateContinuation, isInvitationSecret, readContinuationDigest } from "@/lib/caster/invitation-secret";
 import { CASTER_COOKIE_OPTIONS, CASTER_PRIVATE_HEADERS, casterRpc, isCasterPostOrigin, readSmallCasterBody } from "@/lib/caster/server";
 
 type PrepareResult = { status: "valid" | "invalid" | "expired" | "revoked" | "claimed" | "rate_limited"; expires_at?: string };
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   if (!isCasterProgramEnabled()) return respond("unavailable", 404);
   if (!isCasterPostOrigin(request) || !/^application\/json(?:\s*;|$)/i.test(request.headers.get("content-type") ?? "")) {
     return respond("invalid", 403);
@@ -21,25 +22,34 @@ export async function POST(request: Request) {
   }
   if (!isInvitationSecret(secret)) return respond("invalid", 400, true);
 
-  // The trusted Vercel ingress supplies this header. Loopback testing uses one bucket.
-  const address = request.headers.get("x-vercel-forwarded-for")?.trim() ?? "";
-  const rateKey = invitationRateKey(process.env.VERCEL === "1" && isIP(address) ? address : "unknown-source");
-  if (!rateKey) return respond("unavailable", 503, true);
-
-  const digest = digestInvitationSecret(secret);
-  const result = await casterRpc<PrepareResult>("caster_phase1_prepare", { p_token_digest: digest, p_rate_key: rateKey });
+  const continuation = generateContinuation();
+  const result = await casterRpc<PrepareResult>("caster_phase1_prepare_continuation", {
+    p_token_digest: digestInvitationSecret(secret),
+    p_continuation_digest: continuation.digest,
+    p_source_digest: rateSourceDigest(request),
+    p_previous_continuation_digest: readContinuationDigest(request.cookies.get(CONTINUATION_COOKIE)?.value),
+  });
   if (!result) return respond("unavailable", 503, true);
   if (result.status === "rate_limited") return respond("limited", 429, true);
   if (result.status !== "valid") return respond(result.status, 200, true);
 
-  const continuation = result.expires_at && createInvitationContinuation(digest, result.expires_at);
-  if (!continuation) return respond("unavailable", 503, true);
+  const secondsRemaining = Math.floor((Date.parse(result.expires_at ?? "") - Date.now()) / 1000);
+  if (!Number.isFinite(secondsRemaining) || secondsRemaining <= 0) return respond("unavailable", 503, true);
   const response = respond("ready", 200);
   response.cookies.set(CONTINUATION_COOKIE, continuation.value, {
     ...CASTER_COOKIE_OPTIONS,
-    maxAge: continuation.maxAge,
+    maxAge: Math.min(CONTINUATION_MAX_AGE_SECONDS, secondsRemaining),
   });
   return response;
+}
+
+function rateSourceDigest(request: Request) {
+  // Only the trusted Vercel ingress supplies a source. PostgreSQL HMACs this
+  // prehash with a private pepper before keeping any rate-limit record.
+  const ip = process.env.VERCEL === "1" ? request.headers.get("x-vercel-forwarded-for")?.trim() ?? "" : "";
+  const version = ip.includes("%") ? 0 : isIP(ip);
+  const source = version === 6 ? new URL(`http://[${ip}]/`).hostname : version === 4 ? ip : "unknown-source";
+  return createHash("sha256").update(`ironclad:caster:prepare-source:${source}`).digest("hex");
 }
 
 function respond(status: string, code: number, clear = false) {

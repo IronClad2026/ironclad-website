@@ -4,11 +4,13 @@ import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { CASTER_SIGN_IN_PATH, CASTER_STUDIO_PATH, INVITATION_PATH, type CasterApplication } from "@/lib/caster/contracts";
 import { isCasterProgramEnabled } from "@/lib/caster/environment";
-import { CONTINUATION_COOKIE, readInvitationContinuation } from "@/lib/caster/invitation-secret";
+import { CONTINUATION_COOKIE, readContinuationDigest } from "@/lib/caster/invitation-secret";
 import { casterRpc, loadCurrentCasterAccount } from "@/lib/caster/server";
 import { getCasterStudioCopy } from "@/lib/caster/studio-copy";
+import type { Locale } from "@/lib/i18n/config";
 import { getRequestLocale } from "@/lib/i18n/request";
 import { VERIFIED_DISCORD_TICKET_URL } from "@/lib/support";
+import CasterStudioLegalGate from "./CasterStudioLegalGate";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Caster application · IronClad", robots: { index: false, follow: false }, referrer: "same-origin" };
@@ -17,19 +19,34 @@ const button = "inline-flex min-h-12 items-center justify-center border px-5 py-
 const primary = `${button} border-orange-400 bg-orange-500 text-black hover:bg-orange-300`;
 const secondary = `${button} border-white/20 bg-white/[0.035] text-white hover:border-orange-300/70`;
 
-export default async function CasterStudio({ searchParams }: { searchParams: Promise<{ claim?: string }> }) {
+export default async function CasterStudio({ searchParams }: {
+  searchParams: Promise<{ claim?: string; legal?: string | string[] }>;
+}) {
   if (!isCasterProgramEnabled()) notFound();
+  const [locale, query] = await Promise.all([getRequestLocale(), searchParams]);
+  return (
+    <CasterStudioLegalGate locale={locale} legalError={query.legal}>
+      <CasterStudioContent locale={locale} claimStatus={query.claim} />
+    </CasterStudioLegalGate>
+  );
+}
+
+async function CasterStudioContent({ locale, claimStatus }: { locale: Locale; claimStatus?: string }) {
   const account = await loadCurrentCasterAccount();
   if (account.status === "signed_out") redirect(CASTER_SIGN_IN_PATH);
 
-  const [locale, jar, query] = await Promise.all([getRequestLocale(), cookies(), searchParams]);
+  const jar = await cookies();
   const copy = getCasterStudioCopy(locale);
   const snapshot = account.status === "open"
     ? await casterRpc<{ status: "open" | "closed"; application: CasterApplication | null }>("caster_phase1_get_application", { p_actor: account.id })
     : null;
   const application = snapshot?.status === "open" ? snapshot.application : null;
-  const mayClaim = snapshot?.status === "open" && Boolean(readInvitationContinuation(jar.get(CONTINUATION_COOKIE)?.value));
-  const retry = ["account_changed", "rate_limited", "legal_required", "legal_unavailable", "service_unavailable"].includes(query.claim ?? "");
+  const continuationDigest = readContinuationDigest(jar.get(CONTINUATION_COOKIE)?.value);
+  const continuation = snapshot?.status === "open" && !application && continuationDigest
+    ? await casterRpc<{ status: string }>("caster_phase1_get_continuation", { p_continuation_digest: continuationDigest })
+    : null;
+  const mayClaim = continuation?.status === "valid";
+  const retry = ["account_changed", "rate_limited", "legal_required", "legal_unavailable", "service_unavailable"].includes(claimStatus ?? "");
 
   return (
     <main className="mx-auto min-h-svh max-w-3xl px-5 py-16 text-white sm:px-8">
@@ -64,7 +81,7 @@ export default async function CasterStudio({ searchParams }: { searchParams: Pro
           </div>
         ) : (
           <p role="status" className="text-zinc-300">
-            {snapshot?.status === "open" ? copy.lost : copy.unavailable}
+            {snapshot?.status === "open" && (!continuationDigest || continuation) ? copy.lost : copy.unavailable}
           </p>
         )}
         <div className="mt-8 flex flex-wrap items-center gap-3 border-t border-white/10 pt-5">

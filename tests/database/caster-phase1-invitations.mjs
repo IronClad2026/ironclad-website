@@ -20,6 +20,7 @@ const password = randomBytes(32).toString("base64url");
 const checks = [];
 const clients = [];
 const migration = "20261126094926_caster_phase1_invitations.sql";
+const continuationMigration = "20261126120736_caster_phase1_continuations.sql";
 const prereqs = {
   closure: "20261113010000_patch2_durable_account_closure.sql",
   staff: "20261113045827_patch2_verified_staff_access.sql",
@@ -65,8 +66,13 @@ function section(sql, start, end) {
 }
 
 const issue = (client, key, reference = null, replaces = null, actor = staff) => rpc(client, "caster_phase1_issue($1,$2,$3,$4)", [actor, hash(key), reference, replaces]);
-const prepare = (client, key, source = "unit-source") => rpc(client, "caster_phase1_prepare($1,$2)", [hash(key), hash(source)]);
-const claim = (client, actor, key) => rpc(client, "caster_phase1_claim($1,$2)", [actor, hash(key)]);
+const continuationDigest = (key) => hash(`continuation:${key}`);
+const prepare = (client, key, source = "unit-source", continuation = key, previous = null) =>
+  rpc(client, "caster_phase1_prepare_continuation($1,$2,$3,$4)", [
+    hash(key), continuationDigest(continuation), hash(source), previous ? continuationDigest(previous) : null,
+  ]);
+const getContinuation = (client, key) => rpc(client, "caster_phase1_get_continuation($1)", [continuationDigest(key)]);
+const claim = (client, actor, key) => rpc(client, "caster_phase1_claim_continuation($1,$2)", [actor, continuationDigest(key)]);
 const revoke = (client, id) => rpc(client, "caster_phase1_revoke($1,$2)", [staff, id]);
 const application = (client, actor) => rpc(client, "caster_phase1_get_application($1)", [actor]);
 const snapshot = (client, actor = staff) => rpc(client, "caster_phase1_admin_snapshot($1)", [actor]);
@@ -76,6 +82,7 @@ let postgres;
 let serverLog = "";
 let failure;
 let digest;
+let continuationMigrationDigest;
 try {
   await mkdir(run, { recursive: true });
   await writeFile(passwordFile, `${password}\n`, { flag: "wx" });
@@ -106,7 +113,8 @@ try {
   await query(owner, `
     create role anon; create role authenticated; create role service_role bypassrls; create role authenticator;
     grant anon, authenticated, service_role to authenticator;
-    create schema auth; create schema ironclad_private; create schema storage; create schema realtime;
+    create schema auth; create schema ironclad_private; create schema storage; create schema realtime; create schema extensions;
+    create extension pgcrypto with schema extensions;
     grant usage on schema auth, ironclad_private, storage, realtime to authenticated;
     grant usage on schema auth, ironclad_private to service_role;
     create function auth.jwt() returns jsonb language sql stable as $$
@@ -137,6 +145,9 @@ try {
   const sql = await readMigration(migration);
   digest = hash(sql);
   await query(owner, sql);
+  const continuationSql = await readMigration(continuationMigration);
+  continuationMigrationDigest = hash(continuationSql);
+  await query(owner, continuationSql);
   await query(owner, `insert into public.legal_documents values
     ($1,'terms','effective',now(),now(),repeat('a',64),'https://fixture.invalid/terms','fixture-1'),
     ($2,'privacy','effective',now(),now(),repeat('b',64),'https://fixture.invalid/privacy','fixture-1')`, [terms, privacy]);
@@ -182,9 +193,16 @@ try {
       await assert.rejects(issue(client, "unauthorized"), { code: "42501" });
       await assert.rejects(snapshot(client), { code: "42501" });
       await assert.rejects(prepare(client, "unauthorized"), { code: "42501" });
+      await assert.rejects(getContinuation(client, "unauthorized"), { code: "42501" });
+      await assert.rejects(claim(client, staff, "unauthorized"), { code: "42501" });
       await assert.rejects(application(client, staff), { code: "42501" });
     }
     await assert.rejects(query(server, "select * from ironclad_private.caster_phase1_invitations"), { code: "42501" });
+    await assert.rejects(query(server, "select * from ironclad_private.caster_phase1_continuations"), { code: "42501" });
+    await assert.rejects(query(server, "select * from ironclad_private.caster_phase1_rate_secret"), { code: "42501" });
+    await assert.rejects(query(server, "select ironclad_private.caster_phase1_source_pseudonym($1)", [hash("source")]), { code: "42501" });
+    await assert.rejects(rpc(server, "caster_phase1_prepare($1,$2)", [hash("old-rpc"), hash("source")]), { code: "42501" });
+    await assert.rejects(rpc(server, "caster_phase1_claim($1,$2)", [staff, hash("old-rpc")]), { code: "42501" });
     await assert.rejects(issue(server, "unauthorized", null, null, "user_unverified_staff"), { code: "42501" });
     await assert.rejects(snapshot(server, "user_unverified_staff"), { code: "42501" });
   });
@@ -196,8 +214,19 @@ try {
     assert.equal((await issue(server, "first")).status, "conflict");
     assert.equal((await issue(server, "bad-reference", "a".repeat(43))).status, "invalid");
     assert.deepEqual(await prepare(server, "unknown"), { status: "invalid" });
-    assert.equal((await prepare(server, "first")).status, "valid");
-    assert.equal((await prepare(server, "first")).status, "valid");
+    const prepared = await prepare(server, "first");
+    assert.equal(prepared.status, "valid");
+    assert.deepEqual(await getContinuation(server, "first"), prepared);
+    assert.deepEqual(await prepare(server, "first"), { status: "invalid" });
+    assert.equal((await prepare(server, "first", "unit-source", "first-alt-browser")).status, "valid");
+    assert.deepEqual(await getContinuation(server, "not-prepared"), { status: "unavailable" });
+    assert.deepEqual(await rpc(server, "caster_phase1_get_continuation($1)", [hash("first")]), { status: "unavailable" });
+    const stored = (await query(owner, `select continuation_digest, created_at, expires_at
+      from ironclad_private.caster_phase1_continuations where invitation_id=$1`, [issued.invitation.id])).rows;
+    assert.equal(stored.length, 2);
+    assert.deepEqual(new Set(stored.map((row) => row.continuation_digest.toString("hex"))),
+      new Set([continuationDigest("first"), continuationDigest("first-alt-browser")]));
+    for (const row of stored) assert.equal(row.expires_at - row.created_at, 30 * 60000);
     const records = await snapshot(server);
     assert.equal(records.invitations[0].claimed_by, null);
     assert.deepEqual(records.events.map((event) => event.event_type), ["issued"]);
@@ -219,11 +248,23 @@ try {
     assert.equal((await snapshot(server)).events.filter((event) => event.invitation_id === replacement.invitation.id && event.event_type === "revoked").length, 1);
   });
 
-  await check("Expired invitation is unusable, denied claims leave it untouched, and staff can issue an unrelated replacement", async () => {
+  await check("Continuation expiry is bounded independently by the invitation and elapsed time", async () => {
     const expired = await issue(server, "expired");
-    await query(owner, "update ironclad_private.caster_phase1_invitations set created_at=now()-interval '8 days', expires_at=now()-interval '1 day' where id=$1", [expired.invitation.id]);
+    await query(owner, "update ironclad_private.caster_phase1_invitations set expires_at=now()+interval '2 minutes' where id=$1", [expired.invitation.id]);
+    const prepared = await prepare(server, "expired");
+    assert.equal(prepared.status, "valid");
+    const receipt = (await query(owner, `select c.created_at, c.expires_at, i.expires_at as invite_expires_at
+      from ironclad_private.caster_phase1_continuations c join ironclad_private.caster_phase1_invitations i on i.id=c.invitation_id
+      where c.invitation_id=$1`, [expired.invitation.id])).rows[0];
+    assert.equal(receipt.expires_at.getTime(), receipt.invite_expires_at.getTime());
+    assert.ok(receipt.expires_at - receipt.created_at < 30 * 60000);
+    await query(owner, `update ironclad_private.caster_phase1_continuations set created_at=now()-interval '31 minutes',
+      expires_at=now()-interval '1 minute' where invitation_id=$1`, [expired.invitation.id]);
     await accept(server, "user_expired_claimant");
+    assert.deepEqual(await getContinuation(server, "expired"), { status: "expired" });
     assert.deepEqual(await claim(server, "user_expired_claimant", "expired"), { status: "expired" });
+    assert.equal((await getContinuation(server, "first")).status, "valid");
+    await query(owner, "update ironclad_private.caster_phase1_invitations set created_at=now()-interval '8 days', expires_at=now()-interval '1 day' where id=$1", [expired.invitation.id]);
     assert.deepEqual(await prepare(server, "expired"), { status: "expired" });
     assert.equal((await issue(server, "expired-replacement", null, expired.invitation.id)).status, "issued");
   });
@@ -250,12 +291,15 @@ try {
     const b = "user_caster_race_b";
     await accept(server, a);
     await accept(server, b);
-    const [first, second] = await observeRace(() => claim(server, a, "first"), () => claim(other, b, "first"));
+    const [first, second] = await observeRace(() => claim(server, a, "first"), () => claim(other, b, "first-alt-browser"));
     assert.equal(first.status, "claimed");
     assert.equal(first.application.status, "draft");
     assert.deepEqual(second, { status: "unavailable" });
     assert.deepEqual(await application(server, b), { status: "open", application: null });
     assert.deepEqual((await application(server, a)).application, first.application);
+    assert.deepEqual(await getContinuation(server, "first"), { status: "unavailable" });
+    assert.deepEqual(await getContinuation(server, "first-alt-browser"), { status: "unavailable" });
+    assert.deepEqual(await claim(server, b, "first"), { status: "unavailable" });
     assert.deepEqual(await prepare(server, "first"), { status: "claimed" });
     assert.equal((await snapshot(server)).invitations.find((entry) => entry.reference === "Known caster").claimed_by, a);
   });
@@ -265,11 +309,13 @@ try {
     await accept(server, actor);
     await issue(server, "one-account-first");
     await issue(server, "one-account-second");
+    await prepare(server, "one-account-first");
+    await prepare(server, "one-account-second");
     const [first, second] = await observeRace(() => claim(server, actor, "one-account-first"), () => claim(other, actor, "one-account-second"));
     assert.equal(first.status, "claimed");
     assert.equal(second.status, "already_owned");
     assert.deepEqual(second.application, first.application);
-    assert.equal((await prepare(server, "one-account-second")).status, "valid");
+    assert.equal((await getContinuation(server, "one-account-second")).status, "valid");
     assert.deepEqual(await claim(server, actor, "one-account-first"), second);
   });
 
@@ -278,12 +324,55 @@ try {
     const second = await issue(server, "revoke-first");
     await accept(server, "user_caster_claim_before_revoke");
     await accept(server, "user_caster_revoke_before_claim");
+    await prepare(server, "claim-first");
+    await prepare(server, "revoke-first");
     const initial = await observeRace(() => claim(server, "user_caster_claim_before_revoke", "claim-first"), () => revoke(other, first.invitation.id));
     assert.deepEqual(initial.map((result) => result.status), ["claimed", "claimed"]);
     const inverse = await observeRace(() => revoke(server, second.invitation.id), () => claim(other, "user_caster_revoke_before_claim", "revoke-first"));
     assert.deepEqual(inverse.map((result) => result.status), ["revoked", "revoked"]);
     assert.deepEqual(await application(server, "user_caster_revoke_before_claim"), { status: "open", application: null });
     assert.equal((await issue(server, "replacement-after-claim", null, first.invitation.id)).status, "claimed");
+  });
+
+  await check("Successful preparation invalidates only the previous browser continuation and leaves other devices intact", async () => {
+    await issue(server, "replace-continuation");
+    assert.equal((await prepare(server, "replace-continuation")).status, "valid");
+    assert.equal((await prepare(server, "replace-continuation", "other-device", "other-live-browser")).status, "valid");
+    assert.deepEqual(await prepare(server, "not-issued", "unit-source", "unsuccessful-replacement", "replace-continuation"), { status: "invalid" });
+    assert.deepEqual(await prepare(server, "replace-continuation", "unit-source", "replace-continuation", "replace-continuation"), { status: "invalid" });
+    assert.equal((await getContinuation(server, "replace-continuation")).status, "valid");
+    assert.equal((await prepare(server, "replace-continuation", "unit-source", "new-browser-continuation", "replace-continuation")).status, "valid");
+    assert.deepEqual(await getContinuation(server, "replace-continuation"), { status: "unavailable" });
+    assert.equal((await getContinuation(server, "new-browser-continuation")).status, "valid");
+    assert.equal((await getContinuation(server, "other-live-browser")).status, "valid");
+    await accept(server, "user_caster_old_continuation");
+    assert.deepEqual(await claim(server, "user_caster_old_continuation", "replace-continuation"), { status: "unavailable" });
+    assert.deepEqual(await application(server, "user_caster_old_continuation"), { status: "open", application: null });
+  });
+
+  await check("A prepared replacement can race with a claim without deadlocking or reactivating the used invite", async () => {
+    await issue(server, "claim-as-replacement-runs");
+    await prepare(server, "claim-as-replacement-runs");
+    await accept(server, "user_caster_replace_and_claim");
+    const [claimed, replacement] = await observeRace(
+      () => claim(server, "user_caster_replace_and_claim", "claim-as-replacement-runs"),
+      () => prepare(other, "claim-as-replacement-runs", "unit-source", "concurrent-replacement", "claim-as-replacement-runs"),
+    );
+    assert.equal(claimed.status, "claimed");
+    assert.equal(replacement.status, "claimed");
+    assert.deepEqual(await getContinuation(server, "concurrent-replacement"), { status: "unavailable" });
+    assert.deepEqual(await getContinuation(server, "claim-as-replacement-runs"), { status: "unavailable" });
+
+    await issue(server, "replacement-before-claim");
+    await prepare(server, "replacement-before-claim");
+    await accept(server, "user_caster_replaced_while_claiming");
+    const [replaced, staleClaim] = await observeRace(
+      () => prepare(server, "replacement-before-claim", "unit-source", "winner-replacement", "replacement-before-claim"),
+      () => claim(other, "user_caster_replaced_while_claiming", "replacement-before-claim"),
+    );
+    assert.equal(replaced.status, "valid");
+    assert.deepEqual(staleClaim, { status: "unavailable" });
+    assert.deepEqual(await getContinuation(server, "winner-replacement"), replaced);
   });
 
   await check("Closed Clerk accounts and revoked staff fail closed through existing Patch 2 authority", async () => {
@@ -300,23 +389,38 @@ try {
   await check("Short-window preparation limit covers valid and invalid input without consuming the invitation", async () => {
     for (let attempt = 0; attempt < 30; attempt++) assert.equal((await prepare(server, "not-an-invitation", "burst-source")).status, "invalid");
     assert.deepEqual(await prepare(server, "one-account-second", "burst-source"), { status: "rate_limited" });
-    assert.equal((await prepare(server, "one-account-second", "new-browser-source")).status, "valid");
+    assert.equal((await prepare(server, "one-account-second", "new-browser-source", "new-browser-after-burst")).status, "valid");
     await query(owner, "update public.legal_documents set status='retired' where id=$1", [terms]);
     assert.deepEqual(await claim(server, "user_waits_for_legal", "one-account-second"), { status: "legal_unavailable" });
   });
 
-  await check("Rate cleanup deletes only one bounded batch per preparation and preserves current buckets", async () => {
+  await check("Cleanup deletes bounded batches and persists a keyed source pseudonym without storing its input", async () => {
     await query(owner, `insert into ironclad_private.caster_phase1_request_limits
       select 'fixture-expired', sha256(convert_to(number::text,'UTF8')), now()-interval '3 hours', 1
       from generate_series(1,150) as number`);
     const expiredCount = async () => (await query(owner, `select count(*)::int as count
       from ironclad_private.caster_phase1_request_limits where action='fixture-expired'`)).rows[0].count;
-    assert.equal((await prepare(server, "one-account-second", "cleanup-source")).status, "valid");
+    await query(owner, `insert into ironclad_private.caster_phase1_continuations
+      select sha256(convert_to('expired-fixture-' || number,'UTF8')), invitation_id,
+        now()-interval '35 minutes', now()-interval '5 minutes'
+      from ironclad_private.caster_phase1_continuations cross join generate_series(1,150) as number
+      where continuation_digest=decode($1,'hex')`, [continuationDigest("one-account-second")]);
+    const expiredContinuations = async () => (await query(owner, `select count(*)::int as count
+      from ironclad_private.caster_phase1_continuations where expires_at <= now()`)).rows[0].count;
+    assert.equal((await prepare(server, "one-account-second", "cleanup-source", "cleanup-first")).status, "valid");
     assert.equal(await expiredCount(), 22);
-    assert.equal((await prepare(server, "one-account-second", "cleanup-source")).status, "valid");
+    assert.equal(await expiredContinuations(), 22);
+    assert.equal((await prepare(server, "one-account-second", "cleanup-source", "cleanup-second")).status, "valid");
     assert.equal(await expiredCount(), 0);
-    assert.equal((await query(owner, `select attempts from ironclad_private.caster_phase1_request_limits
-      where action='prepare-source' and subject_digest=decode($1,'hex')`, [hash("cleanup-source")])).rows[0].attempts, 2);
+    assert.equal(await expiredContinuations(), 0);
+    const buckets = (await query(owner, `select attempts, encode(subject_digest,'hex') as persisted
+      from ironclad_private.caster_phase1_request_limits
+      where action='prepare-source' and subject_digest=ironclad_private.caster_phase1_source_pseudonym($1)`, [hash("cleanup-source")])).rows;
+    assert.equal(buckets.length, 1);
+    assert.equal(buckets[0].attempts, 2);
+    assert.notEqual(buckets[0].persisted, hash("cleanup-source"));
+    assert.ok(!serverLog.includes(hash("cleanup-source")));
+    assert.equal((await getContinuation(server, "cleanup-first")).status, "valid");
   });
 
   if (process.argv.includes("--full-lineage")) {
@@ -344,8 +448,10 @@ try {
           throw new Error(`Complete lineage failed at ${file}: ${error.message}`, { cause: error });
         }
       }
-      const result = await query(full, "select to_regclass('ironclad_private.caster_phase1_invitations')::text as invitations");
+      const result = await query(full, `select to_regclass('ironclad_private.caster_phase1_invitations')::text as invitations,
+        to_regclass('ironclad_private.caster_phase1_continuations')::text as continuations`);
       assert.equal(result.rows[0].invitations, "ironclad_private.caster_phase1_invitations");
+      assert.equal(result.rows[0].continuations, "ironclad_private.caster_phase1_continuations");
     });
   }
 } catch (error) {
@@ -356,8 +462,8 @@ try {
     const stop = spawnSync(executable("pg_ctl"), ["-D", data, "-m", "fast", "stop", "-w"], { encoding: "utf8", windowsHide: true, timeout: 30000 });
     if (stop.status !== 0 && !failure) failure = new Error("Disposable PostgreSQL did not stop");
   }
-  await writeFile(resolve(run, "report.json"), JSON.stringify({ passed: !failure, checks, digest }, null, 2) + "\n").catch(() => {});
+  await writeFile(resolve(run, "report.json"), JSON.stringify({ passed: !failure, checks, digest, continuationMigrationDigest }, null, 2) + "\n").catch(() => {});
   await writeFile(resolve(run, "postgres.log"), serverLog).catch(() => {});
 }
 if (failure) throw failure;
-console.log(JSON.stringify({ passed: true, checks, digest, report: resolve(run, "report.json") }, null, 2));
+console.log(JSON.stringify({ passed: true, checks, digest, continuationMigrationDigest, report: resolve(run, "report.json") }, null, 2));

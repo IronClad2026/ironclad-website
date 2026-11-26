@@ -1,3 +1,4 @@
+import { unstable_doesMiddlewareMatch } from "next/experimental/testing/server";
 import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -16,12 +17,13 @@ vi.mock("@clerk/nextjs/server", () => ({
 }));
 vi.mock("@/lib/public-gaming-profile-notice-server", () => ({ loadPublicGamingProfileNotice: mocks.notice }));
 vi.mock("@/lib/supabase-admin", () => ({ createSupabaseAdminClient: () => ({ rpc: mocks.rpc }) }));
+vi.mock("@/components/legal/AccountLegalUpdateGate", () => ({ default: () => null }));
 
 import { POST as acceptLegal } from "@/app/api/caster/legal-acceptance/route";
+import CasterStudioLegalGate from "@/app/caster-studio/CasterStudioLegalGate";
 import { assertCasterBuildEnvironment, getCasterInvitationOrigin } from "@/lib/caster/environment";
-import { readCasterLayoutContext } from "@/lib/caster/layout-context";
-import { CASTER_LAYOUT_HEADER } from "@/lib/caster/routes";
-import proxy from "@/proxy";
+import { CASTER_CHROME_HEADER } from "@/lib/caster/routes";
+import proxy, { config as proxyConfig } from "@/proxy";
 
 const origin = "http://localhost:3013";
 const identity = { userId: "user_newCaster", sessionId: "sess_caster" };
@@ -29,7 +31,6 @@ const localEnvironment = {
   NODE_ENV: "test",
   CASTER_PROGRAM_ENABLED: "true",
   CASTER_PROGRAM_ORIGIN: origin,
-  CASTER_CONTINUATION_KEY: Buffer.alloc(32, 13).toString("base64url"),
   NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321",
   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_fixture",
   CLERK_SECRET_KEY: "sk_test_fixture",
@@ -44,6 +45,7 @@ const receipt = [{
   terms_document_id: terms,
   privacy_document_id: privacy,
 }];
+const forwardedChromeHeader = `x-middleware-request-${CASTER_CHROME_HEADER}`;
 const handler = proxy as unknown as (
   request: NextRequest,
   event: { auth: typeof mocks.auth & { protect: typeof mocks.protect } },
@@ -87,6 +89,7 @@ describe("caster-specific Patch 2 exception", () => {
     mocks.useClerkRequest.mockReturnValue(clerkRedirect);
     expect((await throughProxy("/casters/invitation"))?.headers.get("x-middleware-next")).toBe("1");
     expect((await throughProxy("/casters/invitation", "HEAD"))?.headers.get("location")).toBeNull();
+    expect((await throughProxy("/casters/invitation", "HEAD", { [CASTER_CHROME_HEADER]: "bare" }))?.headers.get(forwardedChromeHeader)).toBeNull();
     expect((await throughProxy("/api/caster/invitation/prepare", "POST"))?.headers.get("x-middleware-next")).toBe("1");
     expect(mocks.useClerkRequest).not.toHaveBeenCalled();
     expect(await throughProxy("/casters/invitation", "POST")).toBe(clerkRedirect);
@@ -101,7 +104,9 @@ describe("caster-specific Patch 2 exception", () => {
   ])(
     "allows the exact public or Clerk read %s", async (path) => {
       mocks.auth.mockResolvedValue({ userId: null });
-      expect((await throughProxy(path))?.headers.get("x-middleware-next")).toBe("1");
+      const response = await throughProxy(path);
+      expect(response?.headers.get("x-middleware-next")).toBe("1");
+      expect(response?.headers.get(forwardedChromeHeader)).toBe("bare");
       expect(mocks.protect).not.toHaveBeenCalled();
       expect(mocks.notice).not.toHaveBeenCalled();
     },
@@ -109,12 +114,11 @@ describe("caster-specific Patch 2 exception", () => {
 
   it("preserves the competitive gate and its destination for a caster-only identity", async () => {
     const studio = await throughProxy("/caster-studio");
-    expect(readCasterLayoutContext(studio?.headers.get(`x-middleware-request-${CASTER_LAYOUT_HEADER}`) ?? null))
-      .toEqual({ view: "studio", legalError: null });
+    expect(studio?.headers.get(forwardedChromeHeader)).toBe("bare");
     expect(studio?.headers.get("x-middleware-request-x-ironclad-notice-layout")).toBeNull();
     expect(mocks.notice).not.toHaveBeenCalled();
 
-    const competitive = await throughProxy("/profile?from=caster", "GET", { [CASTER_LAYOUT_HEADER]: "studio" });
+    const competitive = await throughProxy("/profile?from=caster", "GET", { [CASTER_CHROME_HEADER]: "bare" });
     const destination = new URL(competitive!.headers.get("location")!);
     expect(competitive?.status).toBe(303);
     expect(destination.pathname).toBe("/account/public-profile-notice");
@@ -123,8 +127,10 @@ describe("caster-specific Patch 2 exception", () => {
 
   it("authenticates the exact protected request and returns anonymous studio visits to the clean Clerk route", async () => {
     mocks.auth.mockResolvedValue({ userId: null });
-    expect((await throughProxy("/caster-studio?returnTo=https://bad.example"))?.headers.get("location"))
+    const studio = await throughProxy("/caster-studio?returnTo=https://bad.example", "GET", { [CASTER_CHROME_HEADER]: "bare" });
+    expect(studio?.headers.get("location"))
       .toBe(`${origin}/caster-studio/sign-in`);
+    expect(studio?.headers.get(forwardedChromeHeader)).toBeNull();
     expect((await throughProxy("/api/caster/legal-acceptance", "POST"))?.status).toBe(401);
     expect((await throughProxy("/api/caster/invitation/claim", "POST"))?.status).toBe(401);
     expect((await throughProxy("/api/caster/invitation/prepare", "POST"))?.headers.get("x-middleware-next")).toBe("1");
@@ -134,29 +140,40 @@ describe("caster-specific Patch 2 exception", () => {
     "/caster-studio", "/caster-studio/sign-up", "/casters/invitation", "/caster-studio/other",
     "/api/caster/unrecognised", "/api/steam/connect", "/tournaments", "/api/match-proofs/replay",
   ])("keeps %s outside the POST exception", async (path) => {
-    expect((await throughProxy(path, "POST", { [CASTER_LAYOUT_HEADER]: "studio" }))?.status).toBe(403);
+    expect((await throughProxy(path, "POST", { [CASTER_CHROME_HEADER]: "bare" }))?.status).toBe(403);
   });
 
-  it("rejects Server Action dispatch and scrubbed layout headers while keeping native caster writes independent", async () => {
+  it("rejects Server Action dispatch and strips the chrome marker from native caster writes", async () => {
     for (const path of ["/api/caster/legal-acceptance", "/api/caster/invitation/claim", "/api/caster/invitation/prepare"]) {
       expect((await throughProxy(path, "POST", { "next-action": "forged" }))?.status).toBe(403);
-      expect((await throughProxy(path, "POST"))?.headers.get("x-middleware-next")).toBe("1");
+      const response = await throughProxy(path, "POST", { [CASTER_CHROME_HEADER]: "bare" });
+      expect(response?.headers.get("x-middleware-next")).toBe("1");
+      expect(response?.headers.get(forwardedChromeHeader)).toBeNull();
     }
-    const studio = await throughProxy("/caster-studio?legal=unexpected", "GET", { [CASTER_LAYOUT_HEADER]: "studio.retry" });
-    expect(readCasterLayoutContext(studio?.headers.get(`x-middleware-request-${CASTER_LAYOUT_HEADER}`) ?? null))
-      .toEqual({ view: "studio", legalError: null });
+    const studio = await throughProxy("/caster-studio?legal=unexpected", "GET", { [CASTER_CHROME_HEADER]: "studio.retry" });
+    expect(studio?.headers.get(forwardedChromeHeader)).toBe("bare");
     expect((await throughProxy("/caster-studio/sign-up/continue/other"))?.status).toBe(303);
     expect((await throughProxy("/caster-studio", "HEAD"))?.headers.get("x-middleware-next")).toBe("1");
   });
 
-  it("rejects unsigned, tampered and expired settings on requests the global matcher could skip", async () => {
-    const studio = await throughProxy("/caster-studio?legal=retry");
-    const signed = studio?.headers.get(`x-middleware-request-${CASTER_LAYOUT_HEADER}`) ?? null;
-    expect(readCasterLayoutContext(signed)).toEqual({ view: "studio", legalError: "retry" });
-    expect(readCasterLayoutContext("auth")).toBeNull();
-    expect(readCasterLayoutContext(signed?.replace("studio.", "auth.") ?? null)).toBeNull();
-    vi.spyOn(Date, "now").mockReturnValue(Date.now() + 61_000);
-    expect(readCasterLayoutContext(signed)).toBeNull();
+  it("scrubs caller-supplied chrome markers on ordinary and file-like URLs, including app-router requests", async () => {
+    vi.stubEnv("PATCH2_PUBLIC_PROFILE_NOTICE_ENABLED", "false");
+    const headers = { [CASTER_CHROME_HEADER]: "bare", rsc: "1", "next-router-prefetch": "1" };
+    for (const url of ["/", "/news/article.png", "/_next/data/build/news/article.png.json"]) {
+      expect(unstable_doesMiddlewareMatch({ config: proxyConfig, url, headers })).toBe(true);
+      const response = await throughProxy(url, "GET", headers);
+      expect(response?.headers.get("x-middleware-next")).toBe("1");
+      expect(response?.headers.get(forwardedChromeHeader)).toBeNull();
+    }
+    expect(unstable_doesMiddlewareMatch({ config: proxyConfig, url: "/images/ironclad-logo.png" })).toBe(false);
+  });
+
+  it("renders the studio-owned legal gate independently of the chrome marker", async () => {
+    const children = "private caster page";
+    const legalGate = await CasterStudioLegalGate({ children, locale: "en", legalError: "retry" });
+    expect(legalGate.props).toMatchObject({ children, casterSubmission: true, formError: "unavailable" });
+    const unsupportedError = await CasterStudioLegalGate({ children, locale: "en", legalError: ["retry", "required"] });
+    expect(unsupportedError.props).toMatchObject({ children, casterSubmission: true, formError: undefined });
   });
 
   it("keeps the generic disabled invitation card public without unblocking studio or API access", async () => {
@@ -216,7 +233,6 @@ describe("caster runtime isolation", () => {
       { CASTER_PROGRAM_ENABLED: undefined }, { VERCEL_ENV: "production" },
       { NEXT_PUBLIC_SUPABASE_URL: "https://nsyjtqpvyxlzyujlbzos.supabase.co" },
       { CLERK_SECRET_KEY: "sk_live_fixture" }, { CASTER_PROGRAM_ORIGIN: "https://ironcladtournaments.com" },
-      { CASTER_CONTINUATION_KEY: "too-short" }, { CASTER_CONTINUATION_KEY: undefined },
       { TRANSACTIONAL_EMAIL_MODE: "allowlist" }, { WEB_PUSH_VAPID_PRIVATE_KEY: "configured" },
     ]) expect(getCasterInvitationOrigin({ ...localEnvironment, ...override })).toBeNull();
   });
@@ -248,7 +264,7 @@ describe("caster runtime isolation", () => {
       { SUPABASE_SERVICE_ROLE_KEY: "unverified" }, { NEXT_PUBLIC_SUPABASE_URL: "https://other.supabase.co" },
       { NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_fixture" }, { CLERK_SECRET_KEY: "sk_live_fixture" },
       { TRANSACTIONAL_EMAIL_MODE: "allowlist" }, { CASTER_HOSTED_ISOLATION_VERIFIED: undefined },
-      { PATCH2_PUBLIC_PROFILE_NOTICE_ENABLED: undefined }, { CASTER_CONTINUATION_KEY: undefined },
+      { PATCH2_PUBLIC_PROFILE_NOTICE_ENABLED: undefined },
     ]) {
       expect(getCasterInvitationOrigin({ ...environment, ...override })).toBeNull();
       expect(() => assertCasterBuildEnvironment({ ...environment, ...override })).toThrow("Caster programme opt-in requires");

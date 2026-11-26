@@ -6,9 +6,8 @@ import {
   isSelfAuthenticatedApiPathname,
 } from "@/lib/route-access";
 import { getCasterInvitationOrigin } from "@/lib/caster/environment";
-import { signCasterLayoutContext } from "@/lib/caster/layout-context";
 import {
-  CASTER_LAYOUT_HEADER,
+  CASTER_CHROME_HEADER,
   CASTER_PREPARE_PATH,
   CASTER_SIGN_IN_PATH,
   isCasterInvitationRead,
@@ -30,12 +29,12 @@ const authenticatedProxy = clerkMiddleware(async (auth, request) => {
   const isPageRead = request.method === "GET" || request.method === "HEAD";
   const casterOrigin = getCasterInvitationOrigin();
   const requestHeaders = new Headers(request.headers);
-  const hasSuppliedCasterHeader = requestHeaders.has(CASTER_LAYOUT_HEADER);
+  const hasSuppliedCasterHeader = requestHeaders.has(CASTER_CHROME_HEADER);
   const casterAccess = requestHeaders.has("next-action") ? null : casterRouteAccess(
     pathname, request.method, casterOrigin !== null,
   );
   requestHeaders.delete(NOTICE_LAYOUT_HEADER);
-  requestHeaders.delete(CASTER_LAYOUT_HEADER);
+  requestHeaders.delete(CASTER_CHROME_HEADER);
 
   if (casterAccess) {
     if (casterAccess === "studio" || casterAccess === "protected-api") {
@@ -49,13 +48,7 @@ const authenticatedProxy = clerkMiddleware(async (auth, request) => {
       }
     }
     if (casterAccess === "auth" || casterAccess === "studio") {
-      const legalError = casterAccess === "studio" ? request.nextUrl.searchParams.get("legal") : null;
-      const context = signCasterLayoutContext({
-        view: casterAccess,
-        legalError: legalError === "required" || legalError === "retry" ? legalError : null,
-      });
-      if (!context) return new NextResponse(null, { status: 503 });
-      requestHeaders.set(CASTER_LAYOUT_HEADER, context);
+      requestHeaders.set(CASTER_CHROME_HEADER, "bare");
     }
     return NextResponse.next({ request: { headers: requestHeaders } });
   }
@@ -115,16 +108,23 @@ const authenticatedProxy = clerkMiddleware(async (auth, request) => {
   return NextResponse.next({ request: { headers: requestHeaders } });
 });
 
+function continueStandalone(request: NextRequest) {
+  if (!request.headers.has(CASTER_CHROME_HEADER)) return NextResponse.next();
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.delete(CASTER_CHROME_HEADER);
+  return NextResponse.next({ request: { headers: requestHeaders } });
+}
+
 export default function proxy(request: NextRequest, event: NextFetchEvent) {
   // Clerk can redirect from its session handshake before the callback runs.
   // Serve the standalone invitation shell first so the browser clears the
   // fragment before any redirect can carry it to the identity provider.
-  if (isCasterInvitationRead(request.nextUrl.pathname, request.method)) return NextResponse.next();
+  if (isCasterInvitationRead(request.nextUrl.pathname, request.method)) return continueStandalone(request);
   // This handler validates its own origin and needs no Clerk identity. Keep the
   // raw secret POST out of the session-handshake redirect path as well.
   if (request.nextUrl.pathname === CASTER_PREPARE_PATH && request.method === "POST") {
     if (request.headers.has("next-action")) return new NextResponse(null, { status: 403 });
-    return NextResponse.next();
+    return continueStandalone(request);
   }
   return authenticatedProxy(request, event);
 }
@@ -133,5 +133,8 @@ export const config = {
   matcher: [
     "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|mp3|webm|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
     "/(api|trpc)(.*)",
+    // A dynamic document can have a file-like URL excluded by the first
+    // matcher. Strip supplied chrome markers even on those requests.
+    { source: "/:path*", has: [{ type: "header", key: "x-ironclad-caster-chrome" }] },
   ],
 };

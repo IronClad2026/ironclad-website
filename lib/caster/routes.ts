@@ -5,7 +5,7 @@ export const CASTER_SIGN_UP_PATH = "/caster-studio/sign-up";
 export const CASTER_PREPARE_PATH = "/api/caster/invitation/prepare";
 export const CASTER_CLAIM_PATH = "/api/caster/invitation/claim";
 export const CASTER_LEGAL_PATH = "/api/caster/legal-acceptance";
-export const CASTER_LAYOUT_HEADER = "x-ironclad-caster-layout";
+export const CASTER_CHROME_HEADER = "x-ironclad-caster-chrome";
 
 // These subpaths come from Clerk's prebuilt SignIn and SignUp routers.
 // The app owns only these document reads, not arbitrary catchall children.

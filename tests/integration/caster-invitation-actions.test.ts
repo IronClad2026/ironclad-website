@@ -19,7 +19,7 @@ import { POST as prepare } from "@/app/api/caster/invitation/prepare/route";
 import { POST as claim } from "@/app/api/caster/invitation/claim/route";
 import { updateCasterInvitation } from "@/app/admin/casters/actions";
 import { isCasterRequestAtOrigin } from "@/lib/caster/request-origin";
-import { CONTINUATION_COOKIE, createInvitationContinuation, digestInvitationSecret, generateInvitationSecret, readInvitationContinuation } from "@/lib/caster/invitation-secret";
+import { CONTINUATION_COOKIE, digestInvitationSecret, generateContinuation, generateInvitationSecret, readContinuationDigest } from "@/lib/caster/invitation-secret";
 
 const origin = "https://staging.invalid";
 const actor = "user_synthetic_caster";
@@ -30,8 +30,8 @@ let secret: string;
 function rpcHandler(name: string) {
   const data: Record<string, unknown> = {
     caster_phase1_account_open: true,
-    caster_phase1_prepare: { status: "valid", expires_at: expires },
-    caster_phase1_claim: { status: "claimed" },
+    caster_phase1_prepare_continuation: { status: "valid", expires_at: expires },
+    caster_phase1_claim_continuation: { status: "claimed" },
     caster_phase1_issue: { status: "issued" },
     caster_phase1_revoke: { status: "revoked" },
   };
@@ -50,7 +50,6 @@ function clerkUser(verification = "verified") {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.useFakeTimers({ toFake: ["Date"] }).setSystemTime(new Date("2026-11-26T11:00:00Z"));
-  vi.stubEnv("CASTER_CONTINUATION_KEY", generateInvitationSecret());
   mocks.enabled = true;
   mocks.auth.mockResolvedValue({ userId: actor, sessionId: "sess_test" });
   mocks.legal.mockResolvedValue(undefined);
@@ -65,9 +64,9 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-function prepareRequest(value = secret, source = origin) {
-  return new Request(`${origin}/api/caster/invitation/prepare`, {
-    method: "POST", headers: { Origin: source, "Content-Type": "application/json" }, body: JSON.stringify({ secret: value }),
+function prepareRequest(value = secret, source = origin, headers?: Record<string, string>) {
+  return new NextRequest(`${origin}/api/caster/invitation/prepare`, {
+    method: "POST", headers: { Origin: source, "Content-Type": "application/json", ...headers }, body: JSON.stringify({ secret: value }),
   });
 }
 
@@ -96,7 +95,7 @@ describe("caster invitation route handlers", () => {
     expect(isCasterRequestAtOrigin(internal, origin)).toBe(false);
   });
 
-  it("prepares without a claim, stores only a sealed continuation, then claims the selected account", async () => {
+  it("prepares without a claim, sends only digests to storage, and claims the selected account", async () => {
     const result = await prepare(prepareRequest());
     expect(await result.json()).toEqual({ status: "ready" });
     const cookie = result.cookies.get(CONTINUATION_COOKIE)!;
@@ -104,15 +103,22 @@ describe("caster invitation route handlers", () => {
     expect(cookie).not.toHaveProperty("domain");
     expect(result.headers.get("set-cookie")).not.toContain(secret);
     expect(cookie.value).not.toContain(digestInvitationSecret(secret));
-    expect(mocks.rpc).toHaveBeenCalledExactlyOnceWith("caster_phase1_prepare", {
-      p_token_digest: digestInvitationSecret(secret), p_rate_key: expect.stringMatching(/^[a-f0-9]{64}$/),
+    expect(cookie.value).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(mocks.rpc).toHaveBeenCalledExactlyOnceWith("caster_phase1_prepare_continuation", {
+      p_token_digest: digestInvitationSecret(secret),
+      p_continuation_digest: readContinuationDigest(cookie.value),
+      p_source_digest: expect.stringMatching(/^[a-f0-9]{64}$/),
+      p_previous_continuation_digest: null,
     });
+    expect(readContinuationDigest(cookie.value)).not.toBe(digestInvitationSecret(cookie.value));
 
     const accepted = await claim(claimRequest(cookie.value));
     expect(accepted.status).toBe(303);
     expect(accepted.headers.get("location")).toBe(`${origin}/caster-studio?claim=claimed`);
     expect(accepted.headers.get("set-cookie")).toContain("Max-Age=0");
-    expect(mocks.rpc).toHaveBeenCalledWith("caster_phase1_claim", { p_actor: actor, p_token_digest: digestInvitationSecret(secret) });
+    expect(mocks.rpc).toHaveBeenCalledWith("caster_phase1_claim_continuation", {
+      p_actor: actor, p_continuation_digest: readContinuationDigest(cookie.value),
+    });
     expect(mocks.legal).toHaveBeenCalledOnce();
   });
 
@@ -132,24 +138,50 @@ describe("caster invitation route handlers", () => {
     ["signed out", "signed_out"], ["unverified", "unverified"], ["closed", "closed"],
     ["unavailable legal evidence", "unavailable"], ["changed selected account", "account_changed"],
   ])("rejects claim when %s", async (condition, status) => {
-    const continuation = createInvitationContinuation(digestInvitationSecret(secret), expires)!;
+    const continuation = generateContinuation();
     if (condition === "signed out") mocks.auth.mockResolvedValue({});
     if (condition === "unverified") clerkUser("unverified");
     if (condition === "closed") mocks.rpc.mockImplementation((name: string) => name === "caster_phase1_account_open" ? { abortSignal: async () => ({ data: false }) } : rpcHandler(name));
     if (condition === "unavailable legal evidence") mocks.legal.mockRejectedValue(new Error("Unavailable"));
     const options = condition === "changed selected account" ? { account: "another_user" } : undefined;
     expect((await claim(claimRequest(continuation.value, options))).headers.get("location")).toBe(`${origin}/caster-studio?claim=${status}`);
-    expect(mocks.rpc.mock.calls.some(([name]) => name === "caster_phase1_claim")).toBe(false);
+    expect(mocks.rpc.mock.calls.some(([name]) => name === "caster_phase1_claim_continuation")).toBe(false);
   });
 
-  it("bounds continuation to the invite expiration and rejects modified and expired cookies", () => {
-    const digest = digestInvitationSecret(secret);
-    const continuation = createInvitationContinuation(digest, "2026-11-26T11:10:00Z")!;
-    expect(continuation.maxAge).toBe(600);
-    expect(readInvitationContinuation(continuation.value)).toBe(digest);
-    const modified = `${continuation.value[0] === "A" ? "B" : "A"}${continuation.value.slice(1)}`;
-    expect(readInvitationContinuation(modified)).toBeNull();
-    expect(readInvitationContinuation(continuation.value, Date.parse("2026-11-26T11:10:00Z"))).toBeNull();
+  it("uses the database expiry to bound the browser cookie and passes the previous digest for replacement", async () => {
+    const previous = generateContinuation();
+    mocks.rpc.mockReturnValue({ abortSignal: async () => ({
+      data: { status: "valid", expires_at: "2026-11-26T11:10:00Z" }, error: null,
+    }) });
+    const result = await prepare(prepareRequest(secret, origin, { Cookie: `${CONTINUATION_COOKIE}=${previous.value}` }));
+    expect(result.cookies.get(CONTINUATION_COOKIE)?.maxAge).toBe(600);
+    expect(result.cookies.get(CONTINUATION_COOKIE)?.value).not.toBe(previous.value);
+    expect(mocks.rpc).toHaveBeenCalledWith("caster_phase1_prepare_continuation", expect.objectContaining({
+      p_previous_continuation_digest: previous.digest,
+    }));
+  });
+
+  it("blocks malformed continuations and defers validity of well-formed cookies to the database", async () => {
+    expect((await claim(claimRequest("invalid"))).headers.get("location")).toBe(`${origin}/caster-studio?claim=lost`);
+    expect(mocks.rpc.mock.calls.some(([name]) => name === "caster_phase1_claim_continuation")).toBe(false);
+    mocks.rpc.mockImplementation((name: string) => name === "caster_phase1_claim_continuation"
+      ? { abortSignal: async () => ({ data: { status: "expired" }, error: null }) } : rpcHandler(name));
+    const expired = await claim(claimRequest(generateContinuation().value));
+    expect(expired.headers.get("location")).toBe(`${origin}/caster-studio?claim=expired`);
+    expect(expired.headers.get("set-cookie")).toContain("Max-Age=0");
+  });
+
+  it("normalises trusted Vercel addresses and keeps raw addresses out of database requests", async () => {
+    vi.stubEnv("VERCEL", "1");
+    const expanded = "2001:0DB8:0:0:0:0:0:1";
+    const canonical = "2001:db8::1";
+    await prepare(prepareRequest(secret, origin, { "x-vercel-forwarded-for": expanded }));
+    await prepare(prepareRequest(secret, origin, { "x-vercel-forwarded-for": canonical }));
+    const [[, first], [, second]] = mocks.rpc.mock.calls;
+    expect(first.p_source_digest).toBe(second.p_source_digest);
+    expect(first.p_source_digest).toMatch(/^[a-f0-9]{64}$/);
+    expect(JSON.stringify([first, second])).not.toContain(canonical);
+    expect(JSON.stringify([first, second])).not.toContain(expanded);
   });
 
   it.each(["invalid", "expired", "revoked", "claimed", "rate_limited"])("reports %s without a continuation or claimant identity", async (status) => {
