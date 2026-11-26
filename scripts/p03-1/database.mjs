@@ -21,7 +21,21 @@ for (const name of migrations) {
   try { await client.run(sql); } catch (error) { throw new Error("Migration " + name + ": " + error.message); }
 }
 console.log("PASS full staging migration replay: " + migrations.length);
-await client.run("select public.set_match_room_enabled(true,'match-room-test-4');");
+await client.run(`
+  begin;
+  insert into ironclad_private.patch2_staff_authorizations (subject_digest, verification_reference)
+  values (sha256(convert_to('match-room-test-4', 'UTF8')), 'synthetic P03 Match Room setup');
+
+  set local role service_role;
+  set local request.jwt.claims = '{"role":"service_role"}';
+  select public.set_match_room_enabled(true, 'match-room-test-4');
+
+  set local role none;
+  delete from ironclad_private.patch2_staff_authorizations
+  where subject_digest = sha256(convert_to('match-room-test-4', 'UTF8'))
+    and verification_reference = 'synthetic P03 Match Room setup';
+  commit;
+`);
 const suites = [];
 for (const name of ["match-room-phase-1", "match-room-phase-3", "match-room-production-hardening", "match-room-unread-summary", "announcement-rich-documents"]) {
   const output = await client.run(read("tests/database/" + name + ".sql"));
