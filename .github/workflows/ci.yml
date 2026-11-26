@@ -64,6 +64,7 @@ jobs:
         run: npx playwright test --config tests/browser/match-room/playwright.config.ts
 
       - name: Build
+        if: ${{ !cancelled() }}
         run: npm run build
 
   p03-realtime-database:

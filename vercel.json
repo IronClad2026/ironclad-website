@@ -1,5 +1,10 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "regions": ["hnd1"],
-  "ignoreCommand": "node -e \"process.exit(['codex/ready-wardrobe-pilot', 'codex/ready-wardrobe-dashboard', 'codex/ready-wardrobe-catalogue'].includes(process.env.VERCEL_GIT_COMMIT_REF) ? 0 : 1)\""
+  "git": {
+    "deploymentEnabled": {
+      "codex/caster-phase-1-invitations": false
+    }
+  },
+  "ignoreCommand": "node -e \"process.exit(['codex/ready-wardrobe-pilot', 'codex/ready-wardrobe-dashboard', 'codex/ready-wardrobe-catalogue', 'codex/caster-phase-1-invitations'].includes(process.env.VERCEL_GIT_COMMIT_REF) ? 0 : 1)\""
 }

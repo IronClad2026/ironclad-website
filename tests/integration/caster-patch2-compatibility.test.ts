@@ -18,7 +18,7 @@ vi.mock("@/lib/public-gaming-profile-notice-server", () => ({ loadPublicGamingPr
 vi.mock("@/lib/supabase-admin", () => ({ createSupabaseAdminClient: () => ({ rpc: mocks.rpc }) }));
 
 import { POST as acceptLegal } from "@/app/api/caster/legal-acceptance/route";
-import { assertCasterFeaturePreviewBuildEnvironment, getCasterInvitationOrigin } from "@/lib/caster/environment";
+import { assertCasterBuildEnvironment, getCasterInvitationOrigin } from "@/lib/caster/environment";
 import { readCasterLayoutContext } from "@/lib/caster/layout-context";
 import { CASTER_LAYOUT_HEADER } from "@/lib/caster/routes";
 import proxy from "@/proxy";
@@ -221,60 +221,43 @@ describe("caster runtime isolation", () => {
     ]) expect(getCasterInvitationOrigin({ ...localEnvironment, ...override })).toBeNull();
   });
 
-  it("accepts only the pinned hosted Staging project, host, Clerk domain and verified opt-in", () => {
+  it("uses only the protected canonical Staging alias and permits attested push suppression", () => {
     const stagingOrigin = "https://ironclad-website-git-staging-ironclad-tournaments.vercel.app";
     const environment = {
       ...localEnvironment,
       VERCEL_ENV: "preview",
       VERCEL_GIT_COMMIT_REF: "staging",
-      CASTER_PROGRAM_ORIGIN: stagingOrigin,
+      VERCEL_PROJECT_ID: "prj_5os8tdLLkgGUSWnrxpiYj6OI6YEB",
+      PATCH2_PUBLIC_PROFILE_NOTICE_ENABLED: "true",
+      CASTER_PROGRAM_ORIGIN: undefined,
       CASTER_HOSTED_ISOLATION_VERIFIED: "true",
+      WEB_PUSH_VAPID_PUBLIC_KEY: "configured",
+      WEB_PUSH_VAPID_PRIVATE_KEY: "configured",
+      WEB_PUSH_VAPID_SUBJECT: "configured",
       NEXT_PUBLIC_SUPABASE_URL: "https://zzbnneprhjicmajpjkdg.supabase.co",
       NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: `pk_test_${Buffer.from("guided-goshawk-34.clerk.accounts.dev$").toString("base64url")}`,
       SUPABASE_SERVICE_ROLE_KEY: `header.${Buffer.from(JSON.stringify({ ref: "zzbnneprhjicmajpjkdg", role: "service_role" })).toString("base64url")}.sig`,
     };
     expect(getCasterInvitationOrigin(environment)).toBe(stagingOrigin);
-    expect(getCasterInvitationOrigin({ ...environment, CASTER_HOSTED_ISOLATION_VERIFIED: undefined })).toBeNull();
-    expect(getCasterInvitationOrigin({ ...environment, NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_fixture" })).toBeNull();
-    expect(getCasterInvitationOrigin({ ...environment, SUPABASE_SERVICE_ROLE_KEY: "unverified" })).toBeNull();
-    expect(getCasterInvitationOrigin({ ...environment, CASTER_PROGRAM_ORIGIN: "https://other.vercel.app" })).toBeNull();
-  });
-
-  it("keeps the protected feature branch origin stable across redeploys and rejects other targets", () => {
-    const branchHost = "ironclad-website-git-codex-caster-c7a2-ironclad-tournaments.vercel.app";
-    const environment = {
-      ...localEnvironment,
-      VERCEL_ENV: "preview",
-      VERCEL_GIT_COMMIT_REF: "codex/caster-phase-1-invitations",
-      VERCEL_PROJECT_ID: "prj_5os8tdLLkgGUSWnrxpiYj6OI6YEB",
-      VERCEL_BRANCH_URL: branchHost,
-      VERCEL_URL: "ironclad-website-build1-ironclad-tournaments.vercel.app",
-      CASTER_PROGRAM_ORIGIN: `https://${branchHost}`,
-      CASTER_HOSTED_ISOLATION_VERIFIED: "true",
-      NEXT_PUBLIC_SUPABASE_URL: "https://zzbnneprhjicmajpjkdg.supabase.co",
-      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: `pk_test_${Buffer.from("guided-goshawk-34.clerk.accounts.dev$").toString("base64url")}`,
-      SUPABASE_SERVICE_ROLE_KEY: `header.${Buffer.from(JSON.stringify({ ref: "zzbnneprhjicmajpjkdg", role: "service_role" })).toString("base64url")}.sig`,
-    };
-    expect(getCasterInvitationOrigin(environment)).toBe(`https://${branchHost}`);
-    expect(getCasterInvitationOrigin({ ...environment, VERCEL_URL: "ironclad-website-build2-ironclad-tournaments.vercel.app" })).toBe(`https://${branchHost}`);
+    expect(getCasterInvitationOrigin({ ...environment, CASTER_PROGRAM_ORIGIN: stagingOrigin })).toBe(stagingOrigin);
+    expect(getCasterInvitationOrigin({ ...environment, VERCEL_URL: "another-deployment.vercel.app" })).toBe(stagingOrigin);
+    expect(() => assertCasterBuildEnvironment(environment)).not.toThrow();
     for (const override of [
       { VERCEL_ENV: "production" }, { VERCEL_PROJECT_ID: "prj_other" }, { VERCEL_PROJECT_ID: undefined },
-      { VERCEL_GIT_COMMIT_REF: "codex/another-branch" }, { VERCEL_BRANCH_URL: undefined },
-      { VERCEL_BRANCH_URL: "other.vercel.app", CASTER_PROGRAM_ORIGIN: "https://other.vercel.app" },
-      { CASTER_PROGRAM_ORIGIN: "https://ironclad-website-git-staging-ironclad-tournaments.vercel.app" },
-      { WEB_PUSH_VAPID_PUBLIC_KEY: "configured" },
-    ]) expect(getCasterInvitationOrigin({ ...environment, ...override })).toBeNull();
+      { VERCEL_GIT_COMMIT_REF: "codex/caster-phase-1-invitations" }, { CASTER_PROGRAM_ORIGIN: "https://other.vercel.app" },
+      { SUPABASE_SERVICE_ROLE_KEY: "unverified" }, { NEXT_PUBLIC_SUPABASE_URL: "https://other.supabase.co" },
+      { NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_fixture" }, { CLERK_SECRET_KEY: "sk_live_fixture" },
+      { TRANSACTIONAL_EMAIL_MODE: "allowlist" }, { CASTER_HOSTED_ISOLATION_VERIFIED: undefined },
+      { PATCH2_PUBLIC_PROFILE_NOTICE_ENABLED: undefined }, { CASTER_CONTINUATION_KEY: undefined },
+    ]) {
+      expect(getCasterInvitationOrigin({ ...environment, ...override })).toBeNull();
+      expect(() => assertCasterBuildEnvironment({ ...environment, ...override })).toThrow("Caster programme opt-in requires");
+    }
+  });
 
-    expect(getCasterInvitationOrigin({ ...environment, CASTER_PROGRAM_ORIGIN: `https://${environment.VERCEL_URL}` }))
-      .toBe(`https://${environment.VERCEL_URL}`);
-
-    const disabledBuild = { ...environment, CASTER_PROGRAM_ENABLED: "false", PATCH2_PUBLIC_PROFILE_NOTICE_ENABLED: "true" };
-    expect(() => assertCasterFeaturePreviewBuildEnvironment(disabledBuild)).not.toThrow();
-    for (const override of [
-      { VERCEL_ENV: "production" }, { VERCEL_PROJECT_ID: "prj_other" }, { SUPABASE_SERVICE_ROLE_KEY: undefined },
-      { CLERK_SECRET_KEY: "sk_live_fixture" }, { TRANSACTIONAL_EMAIL_MODE: "allowlist" }, { WEB_PUSH_VAPID_SUBJECT: "configured" },
-      { PATCH2_PUBLIC_PROFILE_NOTICE_ENABLED: undefined },
-    ]) expect(() => assertCasterFeaturePreviewBuildEnvironment({ ...disabledBuild, ...override })).toThrow("Caster feature build requires");
-    expect(() => assertCasterFeaturePreviewBuildEnvironment({ VERCEL_GIT_COMMIT_REF: "staging" })).not.toThrow();
+  it("leaves disabled builds and runtime closed without extra configuration", () => {
+    const environment = { VERCEL_ENV: "preview", VERCEL_GIT_COMMIT_REF: "staging" };
+    expect(getCasterInvitationOrigin(environment)).toBeNull();
+    expect(() => assertCasterBuildEnvironment(environment)).not.toThrow();
   });
 });
