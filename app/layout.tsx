@@ -172,7 +172,7 @@ async function CasterJourneyLayout({ locale, view, legalError, children }: {
   return (
     <ClerkProvider localization={clerkLocalization}>
       <html lang={locale}>
-        <body>
+        <body className="bg-black text-white">
           <LocaleProvider locale={locale} dictionaries={{ common }}>
             {view === "auth" ? children : (
               <AccountLegalUpdateGate copy={common.legalUpdate} casterSubmission formError={formError}>
