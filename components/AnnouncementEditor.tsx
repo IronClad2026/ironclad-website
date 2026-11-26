@@ -19,16 +19,45 @@ import typography from "@/components/AnnouncementTypography.module.css";
 const emptyDocument = { type: "doc", content: [{ type: "paragraph" }] };
 const controlClass = "inline-flex min-h-11 min-w-11 items-center justify-center rounded-sm border border-transparent px-2 text-zinc-300 transition hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-orange-400 disabled:cursor-not-allowed disabled:opacity-35";
 
+const announcementEditorCopy = {
+  field: "Message", formatting: "Message formatting", style: "Text style", paragraph: "Paragraph", heading: "Heading", subheading: "Subheading",
+  bold: "Bold", italic: "Italic", underline: "Underline", bulletList: "Bullet list", numberedList: "Numbered list", link: "Insert or edit link",
+  undo: "Undo", redo: "Redo", help: "Enter for a paragraph · Shift+Enter for a line break.",
+  limit: "This edit exceeds the announcement content limits. Use up to 10,000 characters and keep formatting simple.",
+  linkTitle: "Announcement link", close: "Close link dialog", linkUrl: "Link URL",
+  linkError: "Enter an https:// or http:// URL, or a local path beginning with one /.",
+  linkHelp: "Use a web address or a local path such as /tournaments. Select text first to turn it into a link.",
+  remove: "Remove link", cancel: "Cancel", apply: "Apply link",
+};
+
+export type AnnouncementEditorCopy = typeof announcementEditorCopy;
+
+function countCharacters(document: AnnouncementDocument, countCodePoints: boolean) {
+  const text = getAnnouncementPlainText(document);
+  return countCodePoints ? Array.from(text).length : text.length;
+}
+
 export default function AnnouncementEditor({
   value,
   onChange,
   disabled = false,
+  copy: customCopy,
+  maxLength = ANNOUNCEMENT_LIMITS.body,
+  allowLinks = true,
+  countCodePoints = false,
+  locale = "en-US",
 }: {
   value: AnnouncementDocument | null;
   onChange: (document: AnnouncementDocument) => void;
   disabled?: boolean;
+  copy?: Partial<AnnouncementEditorCopy>;
+  maxLength?: number;
+  allowLinks?: boolean;
+  countCodePoints?: boolean;
+  locale?: string;
 }) {
   const id = useId();
+  const copy = { ...announcementEditorCopy, ...customCopy };
   const onChangeRef = useRef(onChange);
   const lastEmittedRef = useRef<string | null>(null);
   const [contentError, setContentError] = useState<string | null>(null);
@@ -47,7 +76,7 @@ export default function AnnouncementEditor({
       strike: false,
       trailingNode: false,
       heading: { levels: [3, 4] },
-      link: {
+      link: allowLinks && {
         openOnClick: false,
         autolink: false,
         linkOnPaste: false,
@@ -62,8 +91,8 @@ export default function AnnouncementEditor({
           filterTransaction(transaction) {
             if (!transaction.docChanged) return true;
             const document = parseAnnouncementDocument({ version: 1, doc: transaction.doc.toJSON() });
-            if (!document || getAnnouncementPlainText(document).length > ANNOUNCEMENT_LIMITS.body) {
-              setContentError("This edit exceeds the announcement content limits. Use up to 10,000 characters and keep formatting simple.");
+            if (!document || countCharacters(document, countCodePoints) > maxLength) {
+              setContentError(copy.limit);
               return false;
             }
             return true;
@@ -71,7 +100,7 @@ export default function AnnouncementEditor({
         })];
       },
     }),
-  ], []);
+  ], [allowLinks, copy.limit, maxLength, countCodePoints]);
 
   const editor = useEditor({
     extensions,
@@ -82,7 +111,7 @@ export default function AnnouncementEditor({
     editorProps: {
       attributes: {
         role: "textbox",
-        "aria-label": "Message",
+        "aria-label": copy.field,
         "aria-multiline": "true",
         "aria-required": "true",
         "aria-describedby": `${id}-help ${id}-count`,
@@ -106,7 +135,7 @@ export default function AnnouncementEditor({
         normalizeWordLists(document);
         document.querySelectorAll("script,style,meta,link,iframe,object,embed,svg,img,video,audio,input,button,textarea,select").forEach((element) => element.remove());
         document.querySelectorAll("a").forEach((element) => {
-          const href = normalizeAnnouncementHref(element.getAttribute("href"));
+          const href = allowLinks ? normalizeAnnouncementHref(element.getAttribute("href")) : null;
           if (!href) element.replaceWith(...element.childNodes);
           else {
             Array.from(element.attributes).forEach((attribute) => element.removeAttribute(attribute.name));
@@ -169,14 +198,14 @@ export default function AnnouncementEditor({
   }, [editor, value]);
 
   const unavailable = disabled || !editor;
-  const characterCount = value ? getAnnouncementPlainText(value).length : 0;
+  const characterCount = value ? countCharacters(value, countCodePoints) : 0;
 
   return (
     <div className="mt-2 min-w-0">
       <div className={`min-w-0 border border-white/15 bg-black/40 transition focus-within:border-orange-400 ${disabled ? "opacity-60" : ""}`}>
         <div
           role="toolbar"
-          aria-label="Message formatting"
+          aria-label={copy.formatting}
           className="flex flex-wrap items-center gap-0.5 border-b border-white/10 bg-zinc-900/70 p-1.5"
           onKeyDown={(event) => {
             if (!(event.target instanceof HTMLButtonElement) || !["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
@@ -188,7 +217,7 @@ export default function AnnouncementEditor({
           }}
         >
           <select
-            aria-label="Text style"
+            aria-label={copy.style}
             disabled={unavailable}
             value={state?.style ?? "paragraph"}
             className="min-h-11 max-w-full rounded-sm border border-white/10 bg-zinc-950 px-2 text-sm font-bold text-zinc-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-400 disabled:opacity-35"
@@ -197,35 +226,36 @@ export default function AnnouncementEditor({
               else editor?.chain().focus().setHeading({ level: event.target.value === "3" ? 3 : 4 }).run();
             }}
           >
-            <option value="paragraph">Paragraph</option>
-            <option value="3">Heading</option>
-            <option value="4">Subheading</option>
+            <option value="paragraph">{copy.paragraph}</option>
+            <option value="3">{copy.heading}</option>
+            <option value="4">{copy.subheading}</option>
           </select>
-          <ToolbarButton label="Bold" shortcut="Ctrl/⌘+B" active={state?.bold} disabled={unavailable} onClick={() => editor?.chain().focus().toggleBold().run()}><Bold size={18} /></ToolbarButton>
-          <ToolbarButton label="Italic" shortcut="Ctrl/⌘+I" active={state?.italic} disabled={unavailable} onClick={() => editor?.chain().focus().toggleItalic().run()}><Italic size={18} /></ToolbarButton>
-          <ToolbarButton label="Underline" shortcut="Ctrl/⌘+U" active={state?.underline} disabled={unavailable} onClick={() => editor?.chain().focus().toggleUnderline().run()}><Underline size={18} /></ToolbarButton>
+          <ToolbarButton label={copy.bold} shortcut="Ctrl/⌘+B" active={state?.bold} disabled={unavailable} onClick={() => editor?.chain().focus().toggleBold().run()}><Bold size={18} /></ToolbarButton>
+          <ToolbarButton label={copy.italic} shortcut="Ctrl/⌘+I" active={state?.italic} disabled={unavailable} onClick={() => editor?.chain().focus().toggleItalic().run()}><Italic size={18} /></ToolbarButton>
+          <ToolbarButton label={copy.underline} shortcut="Ctrl/⌘+U" active={state?.underline} disabled={unavailable} onClick={() => editor?.chain().focus().toggleUnderline().run()}><Underline size={18} /></ToolbarButton>
           <span className="mx-0.5 h-5 w-px bg-white/10" aria-hidden="true" />
-          <ToolbarButton label="Bullet list" active={state?.bulletList} disabled={unavailable} onClick={() => editor?.chain().focus().toggleBulletList().run()}><List size={18} /></ToolbarButton>
-          <ToolbarButton label="Numbered list" active={state?.orderedList} disabled={unavailable} onClick={() => editor?.chain().focus().toggleOrderedList().run()}><ListOrdered size={18} /></ToolbarButton>
-          <ToolbarButton label="Insert or edit link" active={state?.link} disabled={unavailable} onClick={() => {
+          <ToolbarButton label={copy.bulletList} active={state?.bulletList} disabled={unavailable} onClick={() => editor?.chain().focus().toggleBulletList().run()}><List size={18} /></ToolbarButton>
+          <ToolbarButton label={copy.numberedList} active={state?.orderedList} disabled={unavailable} onClick={() => editor?.chain().focus().toggleOrderedList().run()}><ListOrdered size={18} /></ToolbarButton>
+          {allowLinks ? <ToolbarButton label={copy.link} active={state?.link} disabled={unavailable} onClick={() => {
             if (!editor) return;
             const { from, to } = editor.state.selection;
             setLinkSelection({ from, to, href: String(editor.getAttributes("link").href ?? "") });
-          }}><Link2 size={18} /></ToolbarButton>
+          }}><Link2 size={18} /></ToolbarButton> : null}
           <span className="mx-0.5 h-5 w-px bg-white/10" aria-hidden="true" />
-          <ToolbarButton label="Undo" shortcut="Ctrl/⌘+Z" disabled={unavailable || !state?.canUndo} onClick={() => editor?.chain().focus().undo().run()}><Undo2 size={18} /></ToolbarButton>
-          <ToolbarButton label="Redo" shortcut="Ctrl/⌘+Shift+Z" disabled={unavailable || !state?.canRedo} onClick={() => editor?.chain().focus().redo().run()}><Redo2 size={18} /></ToolbarButton>
+          <ToolbarButton label={copy.undo} shortcut="Ctrl/⌘+Z" disabled={unavailable || !state?.canUndo} onClick={() => editor?.chain().focus().undo().run()}><Undo2 size={18} /></ToolbarButton>
+          <ToolbarButton label={copy.redo} shortcut="Ctrl/⌘+Shift+Z" disabled={unavailable || !state?.canRedo} onClick={() => editor?.chain().focus().redo().run()}><Redo2 size={18} /></ToolbarButton>
         </div>
         <EditorContent editor={editor} />
       </div>
       <div className="mt-2 flex flex-wrap justify-between gap-x-4 gap-y-1 text-xs leading-5 text-zinc-500">
-        <p id={`${id}-help`}>Enter for a paragraph · Shift+Enter for a line break.</p>
-        <p id={`${id}-count`}>{characterCount.toLocaleString("en-US")} / 10,000</p>
+        <p id={`${id}-help`}>{copy.help}</p>
+        <p id={`${id}-count`}>{characterCount.toLocaleString(locale)} / {maxLength.toLocaleString(locale)}</p>
       </div>
       {contentError ? <p role="alert" className="mt-2 text-sm text-red-200">{contentError}</p> : null}
       {linkSelection && editor ? (
         <AnnouncementLinkDialog
           initialHref={linkSelection.href}
+          copy={copy}
           onCancel={() => setLinkSelection(null)}
           onApply={(href) => {
             const chain = editor.chain().setTextSelection({ from: linkSelection.from, to: linkSelection.to }).extendMarkRange("link");
@@ -292,8 +322,9 @@ function ToolbarButton({ label, shortcut, active, disabled, onClick, children }:
   );
 }
 
-function AnnouncementLinkDialog({ initialHref, onCancel, onApply }: {
+function AnnouncementLinkDialog({ initialHref, copy, onCancel, onApply }: {
   initialHref: string;
+  copy: AnnouncementEditorCopy;
   onCancel: () => void;
   onApply: (href: string | null) => void;
 }) {
@@ -318,7 +349,7 @@ function AnnouncementLinkDialog({ initialHref, onCancel, onApply }: {
   const apply = () => {
     const normalized = normalizeAnnouncementHref(href);
     if (!normalized) {
-      setError("Enter an https:// or http:// URL, or a local path beginning with one /.");
+      setError(copy.linkError);
       inputRef.current?.focus();
       return;
     }
@@ -346,10 +377,10 @@ function AnnouncementLinkDialog({ initialHref, onCancel, onApply }: {
         }}
       >
         <div className="flex items-center justify-between gap-4">
-          <h2 id={`${id}-title`} className="text-xl font-black">Announcement link</h2>
-          <button type="button" aria-label="Close link dialog" onClick={onCancel} className={controlClass}><X size={19} aria-hidden="true" /></button>
+          <h2 id={`${id}-title`} className="text-xl font-black">{copy.linkTitle}</h2>
+          <button type="button" aria-label={copy.close} onClick={onCancel} className={controlClass}><X size={19} aria-hidden="true" /></button>
         </div>
-        <label className="mt-4 block text-sm font-bold" htmlFor={`${id}-url`}>Link URL</label>
+        <label className="mt-4 block text-sm font-bold" htmlFor={`${id}-url`}>{copy.linkUrl}</label>
         <input
           ref={inputRef}
           id={`${id}-url`}
@@ -363,12 +394,12 @@ function AnnouncementLinkDialog({ initialHref, onCancel, onApply }: {
           className="mt-2 min-h-11 w-full border border-white/15 bg-black/40 px-3 text-sm text-white outline-none focus:border-orange-400 focus-visible:ring-2 focus-visible:ring-orange-400/50"
           placeholder="https://example.com"
         />
-        <p id={`${id}-help`} className="mt-2 text-xs leading-5 text-zinc-400">Use a web address or a local path such as /tournaments. Select text first to turn it into a link.</p>
+        <p id={`${id}-help`} className="mt-2 text-xs leading-5 text-zinc-400">{copy.linkHelp}</p>
         {error ? <p role="alert" id={`${id}-error`} className="mt-3 text-sm text-red-200">{error}</p> : null}
         <div className="mt-6 flex flex-wrap justify-end gap-3">
-          {initialHref ? <button type="button" onClick={() => onApply(null)} className="mr-auto min-h-11 border border-white/15 px-4 text-sm font-bold text-zinc-300">Remove link</button> : null}
-          <button type="button" onClick={onCancel} className="min-h-11 border border-white/15 px-4 text-sm font-bold text-zinc-200">Cancel</button>
-          <button type="button" onClick={apply} className="min-h-11 bg-orange-500 px-4 text-sm font-black text-black hover:bg-orange-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400">Apply link</button>
+          {initialHref ? <button type="button" onClick={() => onApply(null)} className="mr-auto min-h-11 border border-white/15 px-4 text-sm font-bold text-zinc-300">{copy.remove}</button> : null}
+          <button type="button" onClick={onCancel} className="min-h-11 border border-white/15 px-4 text-sm font-bold text-zinc-200">{copy.cancel}</button>
+          <button type="button" onClick={apply} className="min-h-11 bg-orange-500 px-4 text-sm font-black text-black hover:bg-orange-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400">{copy.apply}</button>
         </div>
       </div>
     </div>

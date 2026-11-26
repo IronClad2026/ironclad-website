@@ -15,7 +15,7 @@ export function isCasterPostOrigin(request: Request) {
     isCasterRequestAtOrigin(request, origin));
 }
 
-export async function readSmallCasterBody(request: Request, maxBytes: number) {
+export async function readBoundedCasterBody(request: Request, maxBytes: number) {
   if (!request.body || Number(request.headers.get("content-length")) > maxBytes) return null;
   const reader = request.body.getReader();
   const buffer = new Uint8Array(maxBytes);
@@ -23,7 +23,7 @@ export async function readSmallCasterBody(request: Request, maxBytes: number) {
   try {
     while (true) {
       const { done, value } = await reader.read();
-      if (done) return new TextDecoder("utf-8", { fatal: true }).decode(buffer.subarray(0, size));
+      if (done) return buffer.subarray(0, size);
       if (size + value.byteLength > maxBytes) {
         await reader.cancel();
         return null;
@@ -35,6 +35,15 @@ export async function readSmallCasterBody(request: Request, maxBytes: number) {
     return null;
   } finally {
     reader.releaseLock();
+  }
+}
+
+export async function readSmallCasterBody(request: Request, maxBytes: number) {
+  const bytes = await readBoundedCasterBody(request, maxBytes);
+  try {
+    return bytes ? new TextDecoder("utf-8", { fatal: true }).decode(bytes) : null;
+  } catch {
+    return null;
   }
 }
 

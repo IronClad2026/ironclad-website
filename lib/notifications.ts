@@ -8,6 +8,8 @@ import notificationsEnglish, {
 import { loadDictionary } from "@/lib/i18n/loaders";
 import { localizePlayerNotificationCopy } from "@/lib/i18n/notification-copy";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
+import { CASTER_NOTIFICATION_TYPE } from "@/lib/caster/application";
+import { CASTER_STUDIO_PATH } from "@/lib/caster/routes";
 
 export type NotificationScope = "player" | "admin";
 
@@ -240,6 +242,22 @@ export async function loadAdminNotifications(): Promise<NotificationLoadResult> 
     notifications: [], totalCount: 0, unreadCount: 0,
     error: "Open a tournament Notifications workspace or choose a scoped Admin inbox.",
   };
+}
+
+export async function loadCasterApplicationNotifications(actor: string) {
+  const { data, error } = await createSupabaseAdminClient().from("notifications")
+    .select("id, metadata, created_at")
+    .eq("type", CASTER_NOTIFICATION_TYPE)
+    .eq("recipient_clerk_user_id", actor)
+    .is("recipient_role", null)
+    .order("created_at", { ascending: false })
+    .limit(8)
+    .abortSignal(AbortSignal.timeout(5_000));
+  if (error) {
+    logNotificationFailure("load-caster-updates", error);
+    return [];
+  }
+  return data ?? [];
 }
 function getValidNotificationCounts(total: unknown, unread: unknown) {
   if (
@@ -564,6 +582,7 @@ function buildNotificationHref(
   row: NotificationRow,
   scope: NotificationScope
 ): string | null {
+  if (row.type === CASTER_NOTIFICATION_TYPE) return scope === "player" ? `${CASTER_STUDIO_PATH}#application` : null;
   if (row.type.startsWith("assistance.")) {
     const requestId = row.metadata?.assistanceRequestId;
     if (!row.tournament_id || !isUuid(row.tournament_id) || typeof requestId !== "string" || !isUuid(requestId)) return null;

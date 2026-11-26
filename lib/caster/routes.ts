@@ -1,3 +1,5 @@
+import { CASTER_APPLICATION_PATH, CASTER_MEDIA_PATH, isCasterMediaId } from "./application";
+
 export const CASTER_INVITATION_PATH = "/casters/invitation";
 export const CASTER_STUDIO_PATH = "/caster-studio";
 export const CASTER_SIGN_IN_PATH = "/caster-studio/sign-in";
@@ -38,9 +40,13 @@ export function casterRouteAccess(pathname: string, method: string, enabled: boo
   if (method === "GET" || method === "HEAD") {
     if (pathname === CASTER_STUDIO_PATH) return "studio";
     if (CLERK_AUTH_PATHS.has(pathname)) return "auth";
+    if (pathname.startsWith(`${CASTER_MEDIA_PATH}/`) && isCasterMediaId(pathname.slice(CASTER_MEDIA_PATH.length + 1))) {
+      return "protected-api";
+    }
   }
   if (method === "POST") {
-    if (pathname === CASTER_CLAIM_PATH || pathname === CASTER_LEGAL_PATH || pathname === CASTER_SIGN_OUT_PATH) {
+    if (pathname === CASTER_CLAIM_PATH || pathname === CASTER_LEGAL_PATH || pathname === CASTER_SIGN_OUT_PATH ||
+      pathname === CASTER_APPLICATION_PATH || pathname === CASTER_MEDIA_PATH) {
       return "protected-api";
     }
   }

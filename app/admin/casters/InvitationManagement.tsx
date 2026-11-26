@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import { Copy, Mic, Plus } from "lucide-react";
 import type { CasterInvitation, CasterInvitationEvent } from "@/lib/caster/contracts";
 import { updateCasterInvitation, type InvitationActionResult } from "./actions";
+import CasterAdminNavigation from "./CasterAdminNavigation";
 
 const initialState: InvitationActionResult = { kind: "idle" };
 const panel = "rounded-2xl border border-white/10 bg-zinc-950/85 p-5 sm:p-6";
@@ -26,6 +27,8 @@ export default function InvitationManagement({ invitations, events, page, hasMor
           <h1 className="text-3xl font-black sm:text-4xl">Caster Management</h1>
           <p className="mt-2 text-zinc-400">Issue and track individual invitations for the Official Caster Programme.</p>
         </div>
+
+        <CasterAdminNavigation current="invitations" />
 
         <section className={panel} aria-labelledby="generate-invitation">
           <h2 id="generate-invitation" className="mb-4 text-xl font-bold">Generate an invitation</h2>
