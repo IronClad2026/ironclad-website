@@ -106,4 +106,15 @@ describe("Caster application editor", () => {
     expect(screen.getByText("1,500 / 2,000")).toBeVisible();
     expect(screen.queryByRole("button", { name: "Insert or edit link" })).toBeNull();
   });
+
+  it("keeps an unchanged saved draft clean when the biography editor loads or remounts", async () => {
+    openStudio();
+    expect(await screen.findByRole("textbox", { name: copy.fields.bio })).toBeVisible();
+    expect(screen.getByRole("button", { name: copy.actions.save })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: copy.actions.next }));
+    fireEvent.click(screen.getByRole("button", { name: copy.actions.previous }));
+    expect(await screen.findByRole("textbox", { name: copy.fields.bio })).toBeVisible();
+    expect(screen.getByRole("button", { name: copy.actions.save })).toBeDisabled();
+    expect(screen.queryByText(copy.result.unsaved)).toBeNull();
+  });
 });

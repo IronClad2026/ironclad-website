@@ -182,7 +182,7 @@ export default function AnnouncementEditor({
 
   useEffect(() => {
     if (!editor) return;
-    editor.setEditable(!disabled && !linkSelection);
+    editor.setEditable(!disabled && !linkSelection, false);
     editor.view.dom.setAttribute("aria-disabled", String(disabled));
   }, [editor, disabled, linkSelection]);
 
