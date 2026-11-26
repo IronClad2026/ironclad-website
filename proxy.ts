@@ -50,7 +50,9 @@ const authenticatedProxy = clerkMiddleware(async (auth, request) => {
     if (casterAccess === "auth" || casterAccess === "studio") {
       requestHeaders.set(CASTER_CHROME_HEADER, "bare");
     }
-    return NextResponse.next({ request: { headers: requestHeaders } });
+    const response = NextResponse.next({ request: { headers: requestHeaders } });
+    if (casterAccess === "studio") response.headers.set("Cache-Control", "private, no-store");
+    return response;
   }
 
   const isReadyAssetRead = isPageRead &&

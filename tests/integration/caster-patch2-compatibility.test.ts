@@ -8,10 +8,13 @@ const mocks = vi.hoisted(() => ({
   notice: vi.fn(),
   useClerkRequest: vi.fn(),
   rpc: vi.fn(),
+  revokeSession: vi.fn(),
+  getSession: vi.fn(),
 }));
 
 vi.mock("@clerk/nextjs/server", () => ({
   auth: mocks.auth,
+  clerkClient: async () => ({ sessions: { revokeSession: mocks.revokeSession, getSession: mocks.getSession } }),
   clerkMiddleware: (callback: (auth: unknown, request: unknown) => unknown) =>
     (request: unknown, event: { auth: unknown }) => mocks.useClerkRequest(() => callback(event.auth, request)),
 }));
@@ -20,13 +23,15 @@ vi.mock("@/lib/supabase-admin", () => ({ createSupabaseAdminClient: () => ({ rpc
 vi.mock("@/components/legal/AccountLegalUpdateGate", () => ({ default: () => null }));
 
 import { POST as acceptLegal } from "@/app/api/caster/legal-acceptance/route";
+import { POST as signOut } from "@/app/api/caster/sign-out/route";
 import CasterStudioLegalGate from "@/app/caster-studio/CasterStudioLegalGate";
 import { assertCasterBuildEnvironment, getCasterInvitationOrigin } from "@/lib/caster/environment";
-import { CASTER_CHROME_HEADER } from "@/lib/caster/routes";
+import { CASTER_CHROME_HEADER, CASTER_SIGN_OUT_PATH } from "@/lib/caster/routes";
 import proxy, { config as proxyConfig } from "@/proxy";
 
 const origin = "http://localhost:3013";
 const identity = { userId: "user_newCaster", sessionId: "sess_caster" };
+const revokedSession = { id: identity.sessionId, userId: identity.userId, status: "revoked" };
 const localEnvironment = {
   NODE_ENV: "test",
   CASTER_PROGRAM_ENABLED: "true",
@@ -70,6 +75,19 @@ function legalPost(body = legalForm(), requestOrigin = origin, nextAction = fals
   return acceptLegal(new Request(`${origin}/api/caster/legal-acceptance`, { method: "POST", body, headers }));
 }
 
+function signOutPost(requestOrigin = origin, nextAction = false) {
+  const headers = new Headers({
+    origin: requestOrigin,
+    cookie: "__session=old; __session_test_123=old; __client_uat=1; __Host-ironclad-caster=pending; other=keep",
+  });
+  if (nextAction) headers.set("next-action", "forged");
+  return signOut(new NextRequest(`${origin}${CASTER_SIGN_OUT_PATH}`, {
+    method: "POST",
+    body: new URLSearchParams({ sessionId: "sess_other", redirect: "https://bad.example" }),
+    headers,
+  }));
+}
+
 beforeEach(() => {
   for (const [key, value] of Object.entries(localEnvironment)) vi.stubEnv(key, value);
   for (const key of ["VERCEL", "VERCEL_ENV", "WEB_PUSH_VAPID_PUBLIC_KEY", "WEB_PUSH_VAPID_PRIVATE_KEY", "WEB_PUSH_VAPID_SUBJECT"]) vi.stubEnv(key, undefined);
@@ -79,6 +97,8 @@ beforeEach(() => {
   mocks.notice.mockResolvedValue("required");
   mocks.useClerkRequest.mockImplementation((next: () => unknown) => next());
   mocks.rpc.mockReturnValue({ abortSignal: () => Promise.resolve({ data: receipt, error: null }) });
+  mocks.revokeSession.mockReset().mockResolvedValue(revokedSession);
+  mocks.getSession.mockReset().mockResolvedValue(revokedSession);
 });
 
 afterEach(() => vi.unstubAllEnvs());
@@ -114,6 +134,7 @@ describe("caster-specific Patch 2 exception", () => {
 
   it("preserves the competitive gate and its destination for a caster-only identity", async () => {
     const studio = await throughProxy("/caster-studio");
+    expect(studio?.headers.get("cache-control")).toBe("private, no-store");
     expect(studio?.headers.get(forwardedChromeHeader)).toBe("bare");
     expect(studio?.headers.get("x-middleware-request-x-ironclad-notice-layout")).toBeNull();
     expect(mocks.notice).not.toHaveBeenCalled();
@@ -133,6 +154,7 @@ describe("caster-specific Patch 2 exception", () => {
     expect(studio?.headers.get(forwardedChromeHeader)).toBeNull();
     expect((await throughProxy("/api/caster/legal-acceptance", "POST"))?.status).toBe(401);
     expect((await throughProxy("/api/caster/invitation/claim", "POST"))?.status).toBe(401);
+    expect((await throughProxy(CASTER_SIGN_OUT_PATH, "POST"))?.status).toBe(401);
     expect((await throughProxy("/api/caster/invitation/prepare", "POST"))?.headers.get("x-middleware-next")).toBe("1");
   });
 
@@ -144,7 +166,7 @@ describe("caster-specific Patch 2 exception", () => {
   });
 
   it("rejects Server Action dispatch and strips the chrome marker from native caster writes", async () => {
-    for (const path of ["/api/caster/legal-acceptance", "/api/caster/invitation/claim", "/api/caster/invitation/prepare"]) {
+    for (const path of ["/api/caster/legal-acceptance", "/api/caster/invitation/claim", "/api/caster/invitation/prepare", CASTER_SIGN_OUT_PATH]) {
       expect((await throughProxy(path, "POST", { "next-action": "forged" }))?.status).toBe(403);
       const response = await throughProxy(path, "POST", { [CASTER_CHROME_HEADER]: "bare" });
       expect(response?.headers.get("x-middleware-next")).toBe("1");
@@ -154,6 +176,12 @@ describe("caster-specific Patch 2 exception", () => {
     expect(studio?.headers.get(forwardedChromeHeader)).toBe("bare");
     expect((await throughProxy("/caster-studio/sign-up/continue/other"))?.status).toBe(303);
     expect((await throughProxy("/caster-studio", "HEAD"))?.headers.get("x-middleware-next")).toBe("1");
+  });
+
+  it("offers only the exact POST sign-out route while the competitive notice is pending", async () => {
+    expect((await throughProxy(CASTER_SIGN_OUT_PATH))?.status).toBe(403);
+    expect((await throughProxy(`${CASTER_SIGN_OUT_PATH}/other`, "POST"))?.status).toBe(403);
+    expect((await throughProxy(CASTER_SIGN_OUT_PATH, "POST"))?.headers.get("x-middleware-next")).toBe("1");
   });
 
   it("scrubs caller-supplied chrome markers on ordinary and file-like URLs, including app-router requests", async () => {
@@ -183,6 +211,43 @@ describe("caster-specific Patch 2 exception", () => {
     expect((await throughProxy("/api/caster/legal-acceptance", "POST"))?.status).toBe(403);
     expect((await legalPost()).status).toBe(404);
     expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+});
+
+describe("caster sign-out handler", () => {
+  it("revokes the Clerk-authenticated session before redirecting and retains the continuation and device state", async () => {
+    const response = await signOutPost();
+    expect(mocks.revokeSession).toHaveBeenCalledExactlyOnceWith(identity.sessionId);
+    expect(mocks.getSession).not.toHaveBeenCalled();
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe(`${origin}/caster-studio/sign-in`);
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+    expect(response.headers.getSetCookie()).toEqual([
+      expect.stringMatching(/^__session=;.*Max-Age=0/),
+      expect.stringMatching(/^__session_test_123=;.*Max-Age=0/),
+    ]);
+  });
+
+  it("rejects forged origins, Server Actions and unauthenticated requests before calling Clerk", async () => {
+    expect((await signOutPost("https://bad.example")).status).toBe(403);
+    expect((await signOutPost(origin, true)).status).toBe(403);
+    mocks.auth.mockResolvedValue({ userId: null, sessionId: null });
+    expect((await signOutPost()).status).toBe(401);
+    expect(mocks.revokeSession).not.toHaveBeenCalled();
+  });
+
+  it("handles an already-ended session and refuses to claim success if Clerk has an active or different session", async () => {
+    mocks.revokeSession.mockRejectedValue(new Error("provider"));
+    expect((await signOutPost()).headers.get("location")).toBe(`${origin}/caster-studio/sign-in`);
+    expect(mocks.getSession).toHaveBeenCalledExactlyOnceWith(identity.sessionId);
+    for (const session of [{ ...revokedSession, status: "active" }, { ...revokedSession, userId: "user_other" }]) {
+      mocks.getSession.mockResolvedValueOnce(session);
+      const response = await signOutPost();
+      expect(response.headers.get("location")).toBe(`${origin}/caster-studio?signOut=retry`);
+      expect(response.headers.getSetCookie()).toEqual([]);
+    }
+    mocks.getSession.mockRejectedValueOnce(new Error("provider"));
+    expect((await signOutPost()).headers.get("location")).toBe(`${origin}/caster-studio?signOut=retry`);
   });
 });
 

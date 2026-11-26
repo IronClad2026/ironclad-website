@@ -5,6 +5,7 @@ export const CASTER_SIGN_UP_PATH = "/caster-studio/sign-up";
 export const CASTER_PREPARE_PATH = "/api/caster/invitation/prepare";
 export const CASTER_CLAIM_PATH = "/api/caster/invitation/claim";
 export const CASTER_LEGAL_PATH = "/api/caster/legal-acceptance";
+export const CASTER_SIGN_OUT_PATH = "/api/caster/sign-out";
 export const CASTER_CHROME_HEADER = "x-ironclad-caster-chrome";
 
 // These subpaths come from Clerk's prebuilt SignIn and SignUp routers.
@@ -39,7 +40,9 @@ export function casterRouteAccess(pathname: string, method: string, enabled: boo
     if (CLERK_AUTH_PATHS.has(pathname)) return "auth";
   }
   if (method === "POST") {
-    if (pathname === CASTER_CLAIM_PATH || pathname === CASTER_LEGAL_PATH) return "protected-api";
+    if (pathname === CASTER_CLAIM_PATH || pathname === CASTER_LEGAL_PATH || pathname === CASTER_SIGN_OUT_PATH) {
+      return "protected-api";
+    }
   }
   return null;
 }

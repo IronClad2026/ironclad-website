@@ -1,10 +1,11 @@
-import { SignOutButton, UserButton } from "@clerk/nextjs";
+import { UserButton } from "@clerk/nextjs";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { CASTER_SIGN_IN_PATH, CASTER_STUDIO_PATH, INVITATION_PATH, type CasterApplication } from "@/lib/caster/contracts";
 import { isCasterProgramEnabled } from "@/lib/caster/environment";
 import { CONTINUATION_COOKIE, readContinuationDigest } from "@/lib/caster/invitation-secret";
+import { CASTER_SIGN_OUT_PATH } from "@/lib/caster/routes";
 import { casterRpc, loadCurrentCasterAccount } from "@/lib/caster/server";
 import { getCasterStudioCopy } from "@/lib/caster/studio-copy";
 import type { Locale } from "@/lib/i18n/config";
@@ -20,18 +21,22 @@ const primary = `${button} border-orange-400 bg-orange-500 text-black hover:bg-o
 const secondary = `${button} border-white/20 bg-white/[0.035] text-white hover:border-orange-300/70`;
 
 export default async function CasterStudio({ searchParams }: {
-  searchParams: Promise<{ claim?: string; legal?: string | string[] }>;
+  searchParams: Promise<{ claim?: string; legal?: string | string[]; signOut?: string }>;
 }) {
   if (!isCasterProgramEnabled()) notFound();
   const [locale, query] = await Promise.all([getRequestLocale(), searchParams]);
   return (
-    <CasterStudioLegalGate locale={locale} legalError={query.legal}>
-      <CasterStudioContent locale={locale} claimStatus={query.claim} />
+    <CasterStudioLegalGate locale={locale} legalError={query.signOut === "retry" ? "retry" : query.legal}>
+      <CasterStudioContent locale={locale} claimStatus={query.claim} signOutFailed={query.signOut === "retry"} />
     </CasterStudioLegalGate>
   );
 }
 
-async function CasterStudioContent({ locale, claimStatus }: { locale: Locale; claimStatus?: string }) {
+async function CasterStudioContent({ locale, claimStatus, signOutFailed }: {
+  locale: Locale;
+  claimStatus?: string;
+  signOutFailed: boolean;
+}) {
   const account = await loadCurrentCasterAccount();
   if (account.status === "signed_out") redirect(CASTER_SIGN_IN_PATH);
 
@@ -84,14 +89,15 @@ async function CasterStudioContent({ locale, claimStatus }: { locale: Locale; cl
             {snapshot?.status === "open" && (!continuationDigest || continuation) ? copy.lost : copy.unavailable}
           </p>
         )}
+        {signOutFailed && <p className="mt-5 text-orange-200" role="alert">{copy.retry}</p>}
         <div className="mt-8 flex flex-wrap items-center gap-3 border-t border-white/10 pt-5">
           {!application && <a href={INVITATION_PATH} className={secondary}>{copy.recover}</a>}
           {account.status === "open" && mayClaim && !account.emailVerified && (
             <a href={CASTER_STUDIO_PATH} className={secondary}>{copy.retry}</a>
           )}
-          <SignOutButton redirectUrl={CASTER_SIGN_IN_PATH}>
-            <button type="button" className={secondary}>{mayClaim && !application ? copy.switchAccount : copy.signout}</button>
-          </SignOutButton>
+          <form action={CASTER_SIGN_OUT_PATH} method="post">
+            <button type="submit" className={secondary}>{mayClaim && !application ? copy.switchAccount : copy.signout}</button>
+          </form>
           {VERIFIED_DISCORD_TICKET_URL && <a className="min-h-12 px-2 py-3 text-orange-200 underline" href={VERIFIED_DISCORD_TICKET_URL} rel="noreferrer">{copy.support}</a>}
         </div>
       </section>
