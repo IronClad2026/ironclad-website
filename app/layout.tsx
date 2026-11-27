@@ -19,7 +19,7 @@ import { loadAccountLegalRuntimeState } from "@/lib/account-legal-acceptance";
 import { isCasterProgramEnabled } from "@/lib/caster/environment";
 import { getCasterProfileCopy } from "@/lib/caster/profile-copy";
 import { getPublicCasterCopy } from "@/lib/caster/public-copy";
-import { CASTER_CHROME_HEADER } from "@/lib/caster/routes";
+import { CASTER_CHROME_HEADER, CASTER_PUBLIC_HOME_CHROME } from "@/lib/caster/routes";
 import { canOpenCasterStudioFromNavigation } from "@/lib/caster/server";
 import { loadClerkLocalization } from "@/lib/i18n/clerk";
 import { loadDictionary } from "@/lib/i18n/loaders";
@@ -92,14 +92,15 @@ export default async function RootLayout({
   const requestHeaders = await headers();
   const casterEnabled = isCasterProgramEnabled();
   const casterDocument = casterEnabled && requestHeaders.get(CASTER_CHROME_HEADER) === "bare";
+  const casterPublicHome = casterEnabled && requestHeaders.get(CASTER_CHROME_HEADER) === CASTER_PUBLIC_HOME_CHROME;
   const noticeDocument = isPublicProfileNoticeInstalled() && requestHeaders.get(NOTICE_LAYOUT_HEADER);
   // These access documents own their content and checks. The proxy's chrome
   // marker only keeps the standard shell and its private queries out of them.
-  if (casterDocument || noticeDocument) {
+  if (casterDocument || noticeDocument || casterPublicHome) {
     return (
       <ClerkProvider localization={await loadClerkLocalization(locale)}>
         <html lang={locale}>
-          <body>{children}</body>
+          <body data-caster-public-home-document={casterPublicHome || undefined}>{children}</body>
         </html>
       </ClerkProvider>
     );

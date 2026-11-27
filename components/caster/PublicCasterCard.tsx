@@ -25,16 +25,18 @@ export function PublicCasterAvatar({ caster, large = false, compact = false }: {
   );
 }
 
-export default function PublicCasterCard({ caster, copy, promote = false, animate = false }: {
+export default function PublicCasterCard({ caster, copy, promote = false, animate = false, documentNavigation = false }: {
   caster: Caster;
   copy: PublicCasterCopy;
   promote?: boolean;
   animate?: boolean;
+  documentNavigation?: boolean;
 }) {
   const Heading = promote ? "h3" : "h2";
+  const ProfileLink = documentNavigation ? "a" : Link;
   return (
-    <Link
-      href={casterPublicProfilePath(caster.slug)} prefetch={false}
+    <ProfileLink
+      href={casterPublicProfilePath(caster.slug)} {...(documentNavigation ? {} : { prefetch: false })}
       className={`group flex h-full min-w-0 flex-col border border-white/15 border-t-orange-400/65 bg-zinc-950 p-5 transition-colors hover:border-orange-400/55 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300 ${promote ? "justify-center sm:p-7" : ""}`}
     >
       <div className={promote ? "relative grow content-center" : "grow"}>
@@ -75,6 +77,6 @@ export default function PublicCasterCard({ caster, copy, promote = false, animat
       <span className="mt-4 inline-flex items-center gap-2 text-sm font-bold text-orange-300 group-hover:text-orange-200">
         {copy.profile}<ArrowRight size={16} aria-hidden="true" className="shrink-0" />
       </span>
-    </Link>
+    </ProfileLink>
   );
 }

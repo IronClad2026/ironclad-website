@@ -73,35 +73,52 @@ type CurrentCasterAccount =
   | { status: "open"; id: string; email: string | null; emailVerified: boolean }
   | { status: "signed_out" | "closed" | "unavailable" };
 
+type CasterSessionIdentity =
+  | { status: "open"; email: string | null; emailVerified: boolean; administrator: boolean }
+  | { status: "closed" }
+  | { status: "unavailable" };
+
+export async function verifyCasterSessionIdentity(userId: string, sessionId: string): Promise<CasterSessionIdentity> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const clerk = await clerkClient();
+    const results = await Promise.race([
+      Promise.all([clerk.users.getUser(userId), clerk.sessions.getSession(sessionId)]),
+      new Promise<null>((resolve) => { timeout = setTimeout(() => resolve(null), 5000); }),
+    ]);
+    if (!results) return { status: "unavailable" };
+    const [user, session] = results;
+    if (user.id !== userId || user.banned || user.locked || session.id !== sessionId ||
+      session.userId !== userId || session.status !== "active" || !Number.isFinite(session.expireAt) ||
+      session.expireAt <= Date.now()) return { status: "closed" };
+
+    const email = user.emailAddresses.find((address) => address.id === user.primaryEmailAddressId);
+    return {
+      status: "open",
+      email: email?.emailAddress ?? null,
+      emailVerified: email?.verification?.status === "verified",
+      administrator: user.publicMetadata?.role === "admin",
+    };
+  } catch {
+    return { status: "unavailable" };
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+}
+
 export async function loadCurrentCasterAccount(): Promise<CurrentCasterAccount> {
   try {
     const { userId, sessionId } = await auth();
     if (!userId || !sessionId) return { status: "signed_out" };
 
     await requireCurrentAccountLegalAcceptance();
-    const clerk = await clerkClient();
-    let timeout: ReturnType<typeof setTimeout> | undefined;
-    try {
-      const results = await Promise.race([
-        Promise.all([
-          clerk.users.getUser(userId),
-          clerk.sessions.getSession(sessionId),
-          casterRpc<boolean>("caster_phase1_account_open", { p_actor: userId }),
-        ]),
-        new Promise<null>((resolve) => { timeout = setTimeout(() => resolve(null), 5000); }),
-      ]);
-      if (!results) return { status: "unavailable" };
-      const [user, session, accountOpen] = results;
-      if (accountOpen === null) return { status: "unavailable" };
-      if (!accountOpen || user.id !== userId || user.banned || user.locked || session.id !== sessionId ||
-        session.userId !== userId || session.status !== "active" || !Number.isFinite(session.expireAt) ||
-        session.expireAt <= Date.now()) return { status: "closed" };
-
-      const email = user.emailAddresses.find((address) => address.id === user.primaryEmailAddressId);
-      return { status: "open", id: userId, email: email?.emailAddress ?? null, emailVerified: email?.verification?.status === "verified" };
-    } finally {
-      if (timeout) clearTimeout(timeout);
-    }
+    const [identity, accountOpen] = await Promise.all([
+      verifyCasterSessionIdentity(userId, sessionId),
+      casterRpc<boolean>("caster_phase1_account_open", { p_actor: userId }),
+    ]);
+    if (accountOpen === null || identity.status === "unavailable") return { status: "unavailable" };
+    if (accountOpen !== true || identity.status === "closed") return { status: "closed" };
+    return { status: "open", id: userId, email: identity.email, emailVerified: identity.emailVerified };
   } catch {
     return { status: "unavailable" };
   }

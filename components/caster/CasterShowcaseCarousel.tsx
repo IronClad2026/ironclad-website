@@ -22,7 +22,9 @@ function subscribeToVisibility(listener: () => void) {
   return () => document.removeEventListener("visibilitychange", listener);
 }
 
-export default function CasterShowcaseCarousel({ casters, copy }: { casters: Caster[]; copy: PublicCasterCopy }) {
+export default function CasterShowcaseCarousel({ casters, copy, documentNavigation }: {
+  casters: Caster[]; copy: PublicCasterCopy; documentNavigation?: boolean;
+}) {
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
   const [hovered, setHovered] = useState(false);
@@ -42,7 +44,7 @@ export default function CasterShowcaseCarousel({ casters, copy }: { casters: Cas
   }, [count, position, rotating]);
 
   if (count === 0) return null;
-  if (count === 1) return <PublicCasterCard caster={casters[0]} copy={copy} promote />;
+  if (count === 1) return <PublicCasterCard caster={casters[0]} copy={copy} promote documentNavigation={documentNavigation} />;
 
   function step(direction: -1 | 1) {
     setPaused(true);
@@ -106,7 +108,7 @@ export default function CasterShowcaseCarousel({ casters, copy }: { casters: Cas
           event.stopPropagation();
         }}
       >
-        <PublicCasterCard caster={casters[position]} copy={copy} promote animate />
+        <PublicCasterCard caster={casters[position]} copy={copy} promote animate documentNavigation={documentNavigation} />
       </div>
     </div>
   );
