@@ -7,7 +7,6 @@ import { casterAdminInput, casterAdminPanel, casterAdminPrimary, casterAdminSeco
 import { loadCastingHistory, saveCastingAssignment } from "./actions";
 import AssignmentFields, { assignmentUtcInput } from "./AssignmentFields";
 import {
-  conflictWarnings,
   coverageActionLabels,
   coverageScopeLabels,
   coverageStatusLabels,
@@ -15,7 +14,6 @@ import {
   type AdminCoverageAssignment,
   type CoverageAuditEvent,
   type CoverageChoices,
-  type CoverageMutation,
   type CoverageMutationResult,
 } from "./contracts";
 
@@ -28,8 +26,8 @@ export default function AssignmentList({ assignments, choices, scoped }: {
   return (
     <section className={`${casterAdminPanel} space-y-4`} aria-labelledby="casting-assignments-title">
       <header className="space-y-1">
-        <Heading id="casting-assignments-title" className="text-lg font-black">{scoped ? "Tournament assignments" : "Casting assignments across tournaments"}</Heading>
-        <p className="text-sm text-zinc-400">Scheduled assignments and verified coverage are tracked separately. Recorded times are in Sydney time.</p>
+        <Heading id="casting-assignments-title" className="text-lg font-black">{scoped ? "Tournament coverage archive" : "Archived casting records"}</Heading>
+        <p className="text-sm text-zinc-400">Historical assignments are read-only. Verified coverage can be corrected with an audit reason. Recorded times are in Sydney time.</p>
       </header>
       {assignments.length ? (
         <ul className="space-y-3">
@@ -39,7 +37,7 @@ export default function AssignmentList({ assignments, choices, scoped }: {
             </li>
           ))}
         </ul>
-      ) : <p className="text-sm text-zinc-300">No casting assignments have been recorded here.</p>}
+      ) : <p className="text-sm text-zinc-300">No archived casting records have been recorded here.</p>}
     </section>
   );
 }
@@ -50,8 +48,7 @@ function AssignmentItem({ assignment, choices, scoped }: {
   scoped: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const canManage = scoped || assignment.tournament_available === false;
-  const changeable = assignment.status === "scheduled" || assignment.status === "completed";
+  const canCorrect = assignment.status === "completed" && Boolean(assignment.verified_at);
   return (
     <>
       <header className="flex min-w-0 flex-wrap items-start justify-between gap-2">
@@ -75,22 +72,21 @@ function AssignmentItem({ assignment, choices, scoped }: {
         </div>}
       </dl>
       {!assignment.target_available && <p className="text-sm text-orange-200">The original competition target is unavailable. This record keeps its original attribution.</p>}
-      {changeable && assignment.conflict && assignment.conflict !== "none" && <p className="text-sm text-orange-200">{conflictWarnings[assignment.conflict]}</p>}
       {assignment.own_match_reason && <p className="whitespace-pre-wrap break-words text-sm text-zinc-300"><strong>Recorded own-match exception</strong> {assignment.own_match_reason}</p>}
       <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm font-bold text-orange-200">
         {assignment.broadcast_url && <a className="inline-flex min-h-11 items-center underline" href={assignment.broadcast_url} rel="noreferrer">Broadcast</a>}
         {assignment.recording_url && <a className="inline-flex min-h-11 items-center underline" href={assignment.recording_url} rel="noreferrer">Recording</a>}
         {assignment.media_url && <a className="inline-flex min-h-11 items-center underline" href={assignment.media_url} rel="noreferrer">{assignment.media_title || "Tournament Media"}</a>}
         {!scoped && assignment.tournament_available !== false && (
-          <Link className="inline-flex min-h-11 items-center underline" prefetch={false} href={coverageWorkspaceHref(assignment.tournament_id)}>Open Tournament Casting</Link>
+          <Link className="inline-flex min-h-11 items-center underline" prefetch={false} href={coverageWorkspaceHref(assignment.tournament_id)}>Open tournament coverage archive</Link>
         )}
       </div>
       <details className="border-t border-white/10 pt-2" onToggle={(event) => setExpanded(event.currentTarget.open)}>
         <summary className="min-h-11 cursor-pointer py-2 font-bold text-orange-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300">
-          {canManage && changeable ? "Manage assignment and view history" : "View assignment history"}
+          {canCorrect ? "Correct verified coverage or inspect the audit" : "View audit history"}
         </summary>
         {expanded && <div className="space-y-4">
-          {canManage && changeable && <AssignmentMutation key={`mutation-${assignment.version}`} assignment={assignment} choices={choices} />}
+          {canCorrect && <AssignmentMutation key={`mutation-${assignment.version}`} assignment={assignment} choices={choices} />}
           <AssignmentHistory key={`history-${assignment.version}`} assignment={assignment.id} />
         </div>}
       </details>
@@ -102,10 +98,6 @@ function AssignmentMutation({ assignment, choices }: {
   assignment: AdminCoverageAssignment;
   choices: CoverageChoices | null;
 }) {
-  const options: CoverageMutation[] = assignment.status === "completed"
-    ? ["correct", "cancel", "unfulfilled"]
-    : assignment.target_available && choices ? ["update", "complete", "cancel", "unfulfilled"] : ["cancel", "unfulfilled"];
-  const [action, setAction] = useState<CoverageMutation>(options[0]);
   const [values, setValues] = useState({
     scheduled: assignmentUtcInput(assignment.scheduled_at),
     covered: assignmentUtcInput(assignment.covered_at),
@@ -114,46 +106,26 @@ function AssignmentMutation({ assignment, choices }: {
     media: assignment.media_id ?? "",
   });
   const [reason, setReason] = useState("");
-  const [acknowledgement, setAcknowledgement] = useState(false);
   const [confirm, setConfirm] = useState(false);
   const [result, submit, pending] = useActionState<CoverageMutationResult, FormData>(saveCastingAssignment, { kind: "idle" });
-  const editLinks = action === "update" || action === "complete" || action === "correct";
-  const ownMatch = (action === "update" || action === "complete") && !assignment.own_match_reason &&
-    (assignment.conflict === "own_match" || result.code === "own_match_ack_required");
-  const requiresReason = ownMatch || action === "correct" || action === "cancel" || action === "unfulfilled";
-  const retracts = assignment.status === "completed" && (action === "cancel" || action === "unfulfilled");
   return (
     <form action={submit} className="space-y-3 rounded-xl border border-white/10 p-4">
       <input type="hidden" name="assignment" value={assignment.id} />
       <input type="hidden" name="version" value={assignment.version} />
+      <input type="hidden" name="action" value="correct" />
+      <AssignmentFields value={values} onChange={setValues} choices={choices} match={assignment.match_id} mode="correct" />
       <label className="block space-y-1 text-sm font-bold">
-        <span>Assignment action</span>
-        <select name="action" className={casterAdminInput} value={action}
-          onChange={(event) => { setAction(event.target.value as CoverageMutation); setConfirm(false); }}>
-          {options.map((option) => <option key={option} value={option}>{coverageActionLabels[option]}</option>)}
-        </select>
-      </label>
-      {action === "update" && <p className="text-sm text-zinc-400">To change the caster or assignment scope, cancel this assignment and schedule a replacement.</p>}
-      {editLinks && <AssignmentFields value={values} onChange={setValues} choices={choices} match={assignment.match_id}
-        mode={action === "update" ? "scheduled" : action === "complete" ? "complete" : "correct"} />}
-      {retracts && <p className="text-sm text-orange-200">This removes effective verified coverage. The original verification remains in the audit history.</p>}
-      {ownMatch && <label className="flex min-h-11 items-start gap-2 text-sm text-orange-200">
-        <input required className="mt-1 size-4 shrink-0 accent-orange-500" type="checkbox" name="acknowledge" value="yes"
-          checked={acknowledgement} onChange={(event) => setAcknowledgement(event.target.checked)} />
-        <span>{conflictWarnings.own_match} I acknowledge the conflict and approve an operational exception.</span>
-      </label>}
-      {requiresReason && <label className="block space-y-1 text-sm font-bold">
-        <span>{ownMatch ? "Exception reason" : "Decision reason"}</span>
+        <span>Correction reason</span>
         <textarea name="reason" className={casterAdminInput} maxLength={2000} required value={reason} onChange={(event) => setReason(event.target.value)} />
-      </label>}
+      </label>
       <label className="flex min-h-11 items-center gap-2 text-sm">
         <input className="size-4 shrink-0 accent-orange-500" type="checkbox" name="confirm" value="yes" required
           checked={confirm} onChange={(event) => setConfirm(event.target.checked)} />
-        {action === "complete" ? "I confirm this caster completed coverage at the recorded scope." : "I confirm this assignment decision."}
+        I confirm this correction to verified coverage.
       </label>
       {result.message && <p role={result.kind === "error" ? "alert" : "status"} className="text-sm text-orange-200">{result.message}</p>}
       <button className={casterAdminPrimary} disabled={pending || !confirm}>
-        {pending ? "Saving…" : coverageActionLabels[action]}
+        {pending ? "Saving…" : coverageActionLabels.correct}
       </button>
     </form>
   );

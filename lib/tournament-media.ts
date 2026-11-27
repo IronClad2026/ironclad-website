@@ -32,6 +32,9 @@ export type TournamentMediaItem = {
   url: string;
   mediaType: TournamentMediaType;
   description: string | null;
+  casterName?: string;
+  casterProfileHref?: string;
+  casterScopeLabel?: string;
 };
 
 export type TournamentMediaAdminItem = TournamentMediaItem & {

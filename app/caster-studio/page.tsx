@@ -1,4 +1,5 @@
 import { UserButton } from "@clerk/nextjs";
+import { Mic2 } from "lucide-react";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
@@ -8,8 +9,7 @@ import { CasterCoverageList } from "@/components/caster/CasterCoverage";
 import type { CasterApplicationResult } from "@/lib/caster/application";
 import { getCasterApplicationCopy } from "@/lib/caster/application-copy";
 import { CASTER_SIGN_IN_PATH, CASTER_STUDIO_PATH, INVITATION_PATH } from "@/lib/caster/contracts";
-import { getCasterCoverageCopy } from "@/lib/caster/coverage-copy";
-import { loadCasterAssignments } from "@/lib/caster/coverage-server";
+import { loadCasterAssignments, loadPublicCasterHistory } from "@/lib/caster/coverage-server";
 import { isCasterProgramEnabled } from "@/lib/caster/environment";
 import { CONTINUATION_COOKIE, readContinuationDigest } from "@/lib/caster/invitation-secret";
 import { getCasterProfileCopy } from "@/lib/caster/profile-copy";
@@ -23,6 +23,9 @@ import { getRequestLocale } from "@/lib/i18n/request";
 import { VERIFIED_DISCORD_TICKET_URL } from "@/lib/support";
 import CasterApplicationEditor from "./CasterApplicationEditor";
 import CasterStudioLegalGate from "./CasterStudioLegalGate";
+import CasterStudioWorkspace from "./CasterStudioWorkspace";
+import { getStudioWorkspaceCopy } from "./studio-workspace-copy";
+import { loadStudioTournamentVideos } from "./StudioTournamentVideoPanels";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Caster Studio · IronClad", robots: { index: false, follow: false }, referrer: "same-origin" };
@@ -32,21 +35,23 @@ const primary = `${button} border-orange-400 bg-orange-500 text-black hover:bg-o
 const secondary = `${button} border-white/20 bg-white/[0.035] text-white hover:border-orange-300/70`;
 
 export default async function CasterStudio({ searchParams }: {
-  searchParams: Promise<{ claim?: string; legal?: string | string[]; signOut?: string }>;
+  searchParams: Promise<{ claim?: string; legal?: string | string[]; signOut?: string; section?: string | string[] }>;
 }) {
   if (!isCasterProgramEnabled()) notFound();
   const [locale, query] = await Promise.all([getRequestLocale(), searchParams]);
   return (
     <CasterStudioLegalGate locale={locale} legalError={query.signOut === "retry" ? "retry" : query.legal}>
-      <CasterStudioContent locale={locale} claimStatus={query.claim} signOutFailed={query.signOut === "retry"} />
+      <CasterStudioContent locale={locale} claimStatus={query.claim} signOutFailed={query.signOut === "retry"}
+        section={typeof query.section === "string" ? query.section : undefined} />
     </CasterStudioLegalGate>
   );
 }
 
-async function CasterStudioContent({ locale, claimStatus, signOutFailed }: {
+async function CasterStudioContent({ locale, claimStatus, signOutFailed, section }: {
   locale: Locale;
   claimStatus?: string;
   signOutFailed: boolean;
+  section?: string;
 }) {
   const account = await loadCurrentCasterAccount();
   if (account.status === "signed_out") redirect(CASTER_SIGN_IN_PATH);
@@ -59,10 +64,38 @@ async function CasterStudioContent({ locale, claimStatus, signOutFailed }: {
   const application = snapshot?.status === "ok" ? snapshot.application : null;
   const isApproved = application?.status === "approved";
   const profileCopy = getCasterProfileCopy(locale);
+  const applicationCopy = getCasterApplicationCopy(locale);
+  const workspaceCopy = getStudioWorkspaceCopy(locale);
   const ownerResult = isApproved && account.status === "open" && account.emailVerified
     ? await casterRpc<CasterWorkingResult>("caster_phase3_owner", { p_actor: account.id }) : null;
   const workingProfile = ownerResult?.status === "ok" ? ownerResult.profile : null;
-  const showAssignments = workingProfile?.membership_status === "active";
+  if (application && workingProfile?.membership_status === "active" && account.status === "open" && account.emailVerified && account.email) {
+    const [tournamentVideos, legacy, portfolioCoverage] = await Promise.all([
+      loadStudioTournamentVideos(account.id, locale).catch(() => null),
+      loadCasterAssignments(account.id),
+      workingProfile.slug && workingProfile.publication_id && !workingProfile.hidden ? loadPublicCasterHistory(workingProfile.slug) : [],
+    ]);
+    const verifiedCoverage = legacy?.filter((entry) => entry.status === "completed" && entry.verified_at && entry.covered_at);
+    return (
+      <CasterStudioWorkspace
+        initialSection={section} application={application} profile={workingProfile}
+        locale={locale} intlLocale={toIntlLocale(locale)} email={account.email} countries={getCountryOptions(locale)}
+        copy={workspaceCopy} applicationCopy={applicationCopy} profileCopy={profileCopy}
+        actionCopy={{ programme: copy.programme, signOut: copy.signout, support: copy.support, retry: copy.retry }}
+        supportUrl={VERIFIED_DISCORD_TICKET_URL || undefined} signOutFailed={signOutFailed}
+        activity={tournamentVideos && tournamentVideos.available !== false ? {
+          publishedCount: tournamentVideos.publishedCount, tournamentIds: tournamentVideos.tournamentIds, recent: tournamentVideos.recent,
+        } : null}
+        verifiedTournamentIds={verifiedCoverage ? verifiedCoverage.map((entry) => entry.tournament_id) : null}
+        portfolioCoverage={portfolioCoverage} portfolioVideos={tournamentVideos?.portfolio ?? []}
+        videos={tournamentVideos?.videos ?? <p role="alert" className="border border-white/12 bg-zinc-950 p-5 text-orange-200">{workspaceCopy.activityUnavailable}</p>}
+        history={<>{tournamentVideos?.history ?? <p role="alert" className="border border-white/12 bg-zinc-950 p-5 text-orange-200">{workspaceCopy.activityUnavailable}</p>}
+          {verifiedCoverage?.length ? <CasterCoverageList records={verifiedCoverage} locale={locale} mode="history" /> : null}
+        </>}
+        notifications={<Suspense fallback={null}><CasterApplicationNotifications actor={account.id} locale={locale} /></Suspense>}
+      />
+    );
+  }
   const continuationDigest = readContinuationDigest(jar.get(CONTINUATION_COOKIE)?.value);
   const continuation = snapshot?.status === "not_found" && continuationDigest
     ? await casterRpc<{ status: string }>("caster_phase1_get_continuation", { p_continuation_digest: continuationDigest })
@@ -71,26 +104,29 @@ async function CasterStudioContent({ locale, claimStatus, signOutFailed }: {
   const retry = ["account_changed", "rate_limited", "legal_required", "legal_unavailable", "service_unavailable"].includes(claimStatus ?? "");
 
   return (
-    <main className="mx-auto min-h-svh max-w-3xl px-5 py-16 text-white sm:px-8">
-      <section id="application" className="border border-white/10 border-t-orange-500 bg-zinc-950 px-4 py-8 min-[400px]:px-6 sm:px-10 sm:py-12">
-        <p className="mb-3 text-sm font-black uppercase text-orange-300">{copy.programme}</p>
-        <h1 className="mb-6 text-3xl font-black sm:text-4xl">{isApproved ? profileCopy.title : copy.title}</h1>
-        {showAssignments && (
-          <a href="#casting-assignments" className="mb-4 inline-flex min-h-11 items-center text-sm font-bold text-orange-200 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300">
-            {getCasterCoverageCopy(locale).studioTitle}
-          </a>
-        )}
+    <main className="mx-auto min-h-svh max-w-4xl px-4 py-8 text-white sm:px-8 sm:py-14">
+      <section id="application" className="border border-white/10 border-t-orange-500 bg-zinc-950 px-4 py-6 min-[400px]:px-6 sm:px-10 sm:py-10">
+        <header className="mb-6 flex min-w-0 items-center gap-4 border-b border-white/10 bg-linear-to-r from-orange-500/[0.07] to-transparent px-3 py-4 sm:mb-8 sm:px-5 sm:py-5">
+          <div aria-hidden="true" className="grid size-11 shrink-0 place-items-center border border-orange-400/40 bg-orange-500/10 text-orange-300 sm:size-14">
+            <Mic2 size={24} />
+          </div>
+          <div className="min-w-0">
+            <p className="mb-1 text-xs font-black tracking-wider text-orange-300 uppercase">{copy.programme}</p>
+            <h1 className="text-2xl font-black [overflow-wrap:anywhere] sm:text-4xl">{isApproved ? profileCopy.title : copy.title}</h1>
+          </div>
+        </header>
         {application && account.status === "open" ? (
           account.emailVerified && account.email ? (
             <>
               {isApproved && !workingProfile ? <p role="alert" className="text-orange-200">{copy.unavailable}</p> : (
                 <CasterApplicationEditor
                   initial={application}
-                  copy={getCasterApplicationCopy(locale)}
+                  copy={applicationCopy}
                   locale={toIntlLocale(locale)}
                   email={account.email}
                   countries={getCountryOptions(locale)}
                   retryLabel={copy.retry}
+                  applicationSteps={{ about: workspaceCopy.about, review: workspaceCopy.review, decisionSupport: workspaceCopy.decisionSupport }}
                   profile={workingProfile ? { initial: workingProfile, copy: profileCopy } : undefined}
                 />
               )}
@@ -109,7 +145,7 @@ async function CasterStudioContent({ locale, claimStatus, signOutFailed }: {
             <p className="break-all"><span className="text-zinc-400">{copy.account}</span> {account.email ?? account.id}</p>
             {retry && <p role="alert" className="text-orange-200">{copy.unavailable}</p>}
             {account.emailVerified ? (
-              <form action="/api/caster/invitation/claim" method="post" className="space-y-5">
+              <form action="/api/caster/invitation/claim" method="post" className="space-y-5 border border-white/12 bg-black/40 p-4 sm:p-5">
                 <input type="hidden" name="account" value={account.id} />
                 <label className="flex items-start gap-3">
                   <input className="mt-1 size-5 shrink-0 accent-orange-500" type="checkbox" name="accept" value="yes" required />
@@ -141,20 +177,8 @@ async function CasterStudioContent({ locale, claimStatus, signOutFailed }: {
           {VERIFIED_DISCORD_TICKET_URL && <a className="min-h-12 px-2 py-3 text-orange-200 underline" href={VERIFIED_DISCORD_TICKET_URL} rel="noreferrer">{copy.support}</a>}
         </div>
       </section>
-      {showAssignments && account.status === "open" && (
-        <div id="casting-assignments" className="mt-5 scroll-mt-6">
-          <Suspense fallback={null}>
-            <StudioAssignments actor={account.id} locale={locale} />
-          </Suspense>
-        </div>
-      )}
     </main>
   );
-}
-
-async function StudioAssignments({ actor, locale }: { actor: string; locale: Locale }) {
-  const assignments = await loadCasterAssignments(actor);
-  return <CasterCoverageList records={assignments ?? []} locale={locale} mode="studio" unavailable={assignments === null} />;
 }
 
 function getCountryOptions(locale: Locale) {

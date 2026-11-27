@@ -101,16 +101,18 @@ describe("caster coverage links", () => {
 });
 
 describe("caster coverage projection", () => {
-  it("keeps public schedules inside the requested competitions and excludes administrative information", async () => {
+  it("keeps only verified public history inside the requested competitions and excludes administrative information", async () => {
+    const verified = { status: "completed", covered_at: "2026-11-26T23:30:00.000Z", verified_at: "2026-11-27T00:00:00.000Z" };
     rpc.mockResolvedValue([
-      row(),
-      row({ tournament_id: ids.unrelated }),
+      row(verified),
+      row({ ...verified, tournament_id: ids.unrelated }),
       row({ status: "cancelled" }),
-      row({ target_available: false }),
-      row({ caster: null }),
+      row(),
+      row({ ...verified, target_available: false }),
+      row({ ...verified, caster: null }),
     ]);
     const result = await loadPublicCasterSchedules([ids.tournament, "invalid", ids.tournament]);
-    expect(rpc).toHaveBeenCalledExactlyOnceWith("caster_phase4_public_schedules", { p_tournament_ids: [ids.tournament] });
+    expect(rpc).toHaveBeenCalledExactlyOnceWith("caster_media_public_verified_tournaments", { p_tournament_ids: [ids.tournament] });
     expect(result).toHaveLength(1);
     expect(result[0]).not.toHaveProperty("application_id");
     expect(result[0]).not.toHaveProperty("conflict");
@@ -143,9 +145,9 @@ describe("caster coverage projection", () => {
 
   it("uses only the authenticated owner's ID and distinguishes unavailable from empty", async () => {
     auth.mockResolvedValue({ userId: "user_Claimant", sessionId: "sess_fixture" });
-    rpc.mockResolvedValueOnce(null).mockResolvedValueOnce({ status: "ok", assignments: [] });
+    rpc.mockResolvedValueOnce(null).mockResolvedValueOnce(null).mockResolvedValueOnce({ status: "ok", assignments: [row()] });
     await expect(loadCasterAssignments("user_Claimant")).resolves.toBeNull();
     await expect(loadCasterAssignments("user_Claimant")).resolves.toEqual([]);
-    expect(rpc).toHaveBeenLastCalledWith("caster_phase4_owner", { p_actor: "user_Claimant" });
+    expect(rpc).toHaveBeenLastCalledWith("caster_media_owner_verified_history", { p_actor: "user_Claimant" });
   });
 });

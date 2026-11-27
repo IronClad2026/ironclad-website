@@ -1,5 +1,6 @@
 "use client";
 
+import { ClipboardCheck } from "lucide-react";
 import { useActionState } from "react";
 import { reviewCasterApplication } from "../../application-actions";
 import {
@@ -25,12 +26,14 @@ export default function ApplicationReviewForm({ applicationId, revisionId, revis
   const decisions = status === "submitted" ? submittedDecisions : reopenedDecisions;
 
   return (
-    <section className={casterAdminPanel} aria-labelledby="application-decision">
-      <h2 id="application-decision" className="text-xl font-bold">Decision for revision {revisionVersion}</h2>
+    <section className={`${casterAdminPanel} min-w-0 border-t-orange-400/60`} aria-labelledby="application-decision">
+      <h2 id="application-decision" className="flex items-center gap-2 text-xl font-bold">
+        <ClipboardCheck size={20} aria-hidden="true" className="shrink-0 text-orange-300" />Decision for revision {revisionVersion}
+      </h2>
       {status === "submitted" && !canApprove && (
         <p className="mt-2 text-sm text-zinc-400">Approval requires an available account with a verified primary email.</p>
       )}
-      <form action={action} className="mt-4 space-y-4">
+      <form action={action} aria-busy={pending} className="mt-4 space-y-4">
         <input type="hidden" name="application" value={applicationId} />
         <input type="hidden" name="revision" value={revisionId} />
         <label className="grid gap-2 text-sm font-bold sm:max-w-md">

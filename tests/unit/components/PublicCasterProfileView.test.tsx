@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import PublicCasterProfileView from "@/components/caster/PublicCasterProfileView";
 import { getPublicCasterCopy } from "@/lib/caster/public-copy";
 import type { PublicCasterProfile } from "@/lib/caster/publication";
+import type { CasterTournamentVideo } from "@/lib/caster/tournament-video";
 
 const copy = getPublicCasterCopy("en");
 const profile: PublicCasterProfile = {
@@ -57,5 +58,38 @@ describe("public caster profile", () => {
     expect(screen.getByTitle("YouTube player")).toHaveAttribute("src", "https://www.youtube-nocookie.com/embed/abcdefghijk");
     fireEvent.click(screen.getByRole("button", { name: "Hide player" }));
     expect(screen.queryByTitle("YouTube player")).toBeNull();
+  });
+
+  it("offers an editor shortcut only for the authorised owner and keeps draft media private", () => {
+    const draft = { ...profile, banner: "10000000-0000-4000-8000-000000000003" };
+    const result = render(<PublicCasterProfileView caster={draft} copy={copy} locale="en" />);
+    expect(screen.queryByRole("link", { name: copy.manageProfile })).toBeNull();
+    result.rerender(<PublicCasterProfileView caster={draft} copy={copy} locale="en" canManage />);
+    expect(screen.getByRole("link", { name: copy.manageProfile })).toHaveAttribute("href", "/caster-studio?section=profile");
+    result.rerender(<PublicCasterProfileView caster={draft} copy={copy} locale="en" canManage mode="draft" />);
+    expect(screen.queryByRole("link", { name: copy.manageProfile })).toBeNull();
+    expect(screen.queryByRole("link", { name: copy.back })).toBeNull();
+    expect(screen.getByRole("link", { name: "Gallery image 1" })).toHaveAttribute("href", `/api/caster/media/${draft.gallery[0]}`);
+    expect(result.container.querySelectorAll('img[src^="/api/caster/media/"]')).toHaveLength(3);
+    expect(screen.queryByRole("button", { name: /Load.*player/ })).toBeNull();
+  });
+
+  it("lists allowed caster publications separately from personal media without claiming verification", () => {
+    const video: CasterTournamentVideo = {
+      id: "recording", title: "Round one commentary", description: "Synthetic fixture recording",
+      url: "https://www.youtube.com/watch?v=zyxwvutsrqp", tournamentTitle: "My tournament",
+      tournamentHref: "/tournaments?tournament=my-tournament&tab=media#tournament-media-recording",
+      scopeLabel: "Academy · Round 1", publishedAt: "2026-11-26T10:00:00Z", published: true,
+      moderationStatus: "visible", version: 1, tournamentId: "tournament", divisionId: null, matchId: null, casterName: null,
+      publiclyVisible: true,
+    };
+    render(<PublicCasterProfileView caster={profile} copy={copy} locale="en"
+      tournamentVideos={[video, { ...video, id: "hidden", title: "Hidden fixture", moderationStatus: "hidden" }]} />);
+    expect(screen.getByRole("heading", { name: copy.tournamentVideos })).toBeVisible();
+    expect(screen.getByRole("heading", { name: copy.featured })).toBeVisible();
+    expect(screen.getByRole("link", { name: copy.tournamentMedia })).toHaveAttribute("href", video.tournamentHref);
+    expect(screen.getByText("My tournament · Academy · Round 1")).toBeVisible();
+    expect(screen.queryByText("Hidden fixture")).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Verified IronClad Coverage" })).toBeNull();
   });
 });

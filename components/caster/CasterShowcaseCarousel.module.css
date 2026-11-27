@@ -1,14 +1,64 @@
-.slide {
+.viewport {
+  position: relative;
+  min-width: 0;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-color: var(--color-orange-500) var(--color-zinc-900);
+}
+.track {
+  display: flex;
+  width: max-content;
+}
+.group {
+  display: flex;
+  flex: none;
+  position: relative;
+  align-items: stretch;
+  gap: 0.875rem;
+  padding-inline-end: 0.875rem;
+}
+.group > li {
+  flex: none;
+  width: clamp(15rem, 72vw, 19rem);
+}
+.viewport[data-mode="browse"] [data-caster-repeat] {
+  display: none;
+}
+.viewport[data-mode="moving"] {
+  overflow: clip;
   touch-action: pan-y pinch-zoom;
 }
-
-@media (prefers-reduced-motion: no-preference) {
-  .slide [data-caster-slide-content="true"] {
-    animation: reveal-caster 220ms ease-out both;
+.viewport[data-mode="moving"]::after {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(to right, var(--color-zinc-950), transparent 1rem, transparent calc(100% - 1rem), var(--color-zinc-950));
+  content: "";
+}
+.viewport[data-mode="moving"] > .track {
+  animation: caster-travel var(--caster-duration) linear infinite;
+}
+.viewport[data-mode="moving"][data-paused="true"] > .track {
+  animation-play-state: paused;
+}
+@media (hover: hover) {
+  .viewport[data-mode="moving"]:hover > .track {
+    animation-play-state: paused;
   }
 }
-
-@keyframes reveal-caster {
-  from { opacity: 0; transform: translateY(5px); }
-  to { opacity: 1; transform: translateY(0); }
+@media (prefers-reduced-motion: reduce) {
+  .viewport[data-mode="moving"] {
+    overflow-x: auto;
+    touch-action: auto;
+  }
+  .viewport[data-mode="moving"]::after,
+  .viewport [data-caster-repeat] {
+    display: none;
+  }
+  .viewport[data-mode="moving"] > .track {
+    animation: none;
+  }
+}
+@keyframes caster-travel {
+  to { transform: translateX(calc(-1 * var(--caster-distance))); }
 }
