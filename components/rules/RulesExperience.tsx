@@ -142,7 +142,7 @@ function HeroSection({ copy, effectiveDate, reduceMotion }: RulesSectionProps & 
       <div className="relative z-10 mx-auto grid w-full max-w-7xl gap-8 lg:grid-cols-[minmax(0,1fr)_390px] lg:items-end">
         <motion.div initial={reduceMotion ? false : "hidden"} animate="visible" variants={fadeUp} transition={{ duration: reduceMotion ? 0 : 0.75 }} className="max-w-5xl">
           <p className="locale-display text-sm font-black uppercase text-orange-300">{hero.eyebrow}</p>
-          <h1 className="locale-display mt-5 max-w-5xl text-5xl font-black leading-[0.96] text-white sm:text-6xl lg:text-8xl">{hero.title}</h1>
+          <h1 data-mascot-attention="rules-heading" className="locale-display mt-5 max-w-5xl text-5xl font-black leading-[0.96] text-white sm:text-6xl lg:text-8xl">{hero.title}</h1>
           <p className="mt-7 max-w-3xl text-base leading-8 text-zinc-300 sm:text-lg">{hero.description}</p>
           <div className="mt-9 w-fit border border-emerald-300/35 bg-emerald-300/10 px-4 py-3 text-sm font-black uppercase tracking-wide text-emerald-100" role="status">
             {interpolateMessage(hero.effective, { date: effectiveDate })}

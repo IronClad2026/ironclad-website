@@ -14,7 +14,8 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@clerk/nextjs/server", () => ({
   auth: mocks.auth,
-  clerkMiddleware: (callback: unknown) => callback,
+  clerkMiddleware: (callback: (auth: unknown, request: unknown) => unknown) =>
+    (request: unknown, event: { auth: unknown }) => callback(event.auth, request),
 }));
 vi.mock("@clerk/nextjs", () => ({
   SignOutButton: ({ children }: { children: React.ReactNode }) => children,
@@ -46,13 +47,13 @@ import {
 const origin = "https://test.ironclad.invalid";
 const identity = { userId: "user_fixtureOnly" };
 const proxyHandler = proxy as unknown as (
-  authority: (() => Promise<typeof identity | { userId: null }>) & { protect: typeof mocks.protect },
   request: NextRequest,
+  event: { auth: (() => Promise<typeof identity | { userId: null }>) & { protect: typeof mocks.protect } },
 ) => Promise<Response | undefined>;
 
 const invokeProxy = (path: string, method = "GET") => proxyHandler(
-  Object.assign(mocks.auth, { protect: mocks.protect }),
   new NextRequest(origin + path, { method, headers: { [NOTICE_LAYOUT_HEADER]: "spoofed" } }),
+  { auth: Object.assign(mocks.auth, { protect: mocks.protect }) },
 );
 
 function post(path: string, input: string | URLSearchParams, requestOrigin = origin) {

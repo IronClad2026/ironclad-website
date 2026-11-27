@@ -4,6 +4,7 @@ import {
   Clock,
   MapPinned,
   Megaphone,
+  Mic,
   Plus,
   ShieldAlert,
   Trophy,
@@ -14,6 +15,8 @@ import { redirect } from "next/navigation";
 
 import AdminAccessRequired from "@/components/admin/AdminAccessRequired";
 import { hasAdminPageAccess } from "@/lib/admin-page-access";
+import { isReadyEngagementEnabled } from "@/lib/ready/review-access";
+import { isCasterProgramEnabled } from "@/lib/caster/environment";
 import type { AdminRegistrationStatus } from "@/lib/admin-registration-review";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import {
@@ -332,11 +335,21 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 label: "Operations & Analytics",
                 icon: Activity,
               },
+              ...(isReadyEngagementEnabled() ? [{
+                href: "/admin/ready-usage",
+                label: "Ready usage",
+                icon: Activity,
+              }] : []),
               {
                 href: "/admin/tournaments",
                 label: "Manage Tournaments",
                 icon: Trophy,
               },
+              ...(isCasterProgramEnabled() ? [{
+                href: "/admin/casters",
+                label: "Caster Management",
+                icon: Mic,
+              }] : []),
               {
                 href: "/admin/maps",
                 label: "Global Map Catalogue",
@@ -363,6 +376,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 <Link
                   key={item.href}
                   href={item.href}
+                  prefetch={["/admin/ready-usage", "/admin/casters"].includes(item.href) ? false : undefined}
                   className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-white/15 bg-black/45 px-4 py-3 text-sm font-bold text-zinc-200 transition hover:border-orange-400/50 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300"
                 >
                   <Icon className="h-4 w-4 text-orange-400" aria-hidden="true" />

@@ -10,6 +10,7 @@ import {
   LifeBuoy,
   Map,
   Menu,
+  Mic,
   Pencil,
   Settings,
   Swords,
@@ -38,6 +39,7 @@ export type TournamentManagementSection =
   | "matches"
   | "replays"
   | "media"
+  | "casting"
   | "map-pool"
   | "controls";
 
@@ -68,6 +70,7 @@ export const TOURNAMENT_MANAGEMENT_SECTIONS: readonly TournamentManagementMenuIt
     { icon: Swords, label: "Matches / Results", section: "matches" },
     { icon: Film, label: "Replay Archive", section: "replays" },
     { icon: Clapperboard, label: "Media", section: "media" },
+    { icon: Mic, label: "Casting", section: "casting" },
     { icon: Map, label: "Map Pool", section: "map-pool" },
     {
       icon: Settings,
@@ -88,9 +91,11 @@ const dialogFocusableSelector = [
 
 export default function TournamentManagementMenu({
   activeSection,
+  castingEnabled = false,
   tournamentId,
 }: {
   activeSection: TournamentManagementSection;
+  castingEnabled?: boolean;
   tournamentId: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -264,7 +269,7 @@ export default function TournamentManagementMenu({
                 className="pt-4"
               >
                 <ul className="space-y-1.5">
-                  {TOURNAMENT_MANAGEMENT_SECTIONS.map((item) => {
+                  {TOURNAMENT_MANAGEMENT_SECTIONS.filter((item) => castingEnabled || item.section !== "casting").map((item) => {
                     const Icon = item.icon;
                     const active = activeSection === item.section;
                     return (
@@ -313,9 +318,11 @@ export default function TournamentManagementMenu({
 
 export function TournamentDesktopSectionNavigation({
   activeSection,
+  castingEnabled = false,
   tournamentId,
 }: {
   activeSection: TournamentManagementSection;
+  castingEnabled?: boolean;
   tournamentId: string;
 }) {
   return (
@@ -324,7 +331,7 @@ export function TournamentDesktopSectionNavigation({
       className="mt-4 hidden border-t border-white/10 pt-4 xl:block"
     >
       <ul className="grid grid-cols-3 gap-1.5 2xl:grid-cols-6">
-        {TOURNAMENT_MANAGEMENT_SECTIONS.map((item) => {
+        {TOURNAMENT_MANAGEMENT_SECTIONS.filter((item) => castingEnabled || item.section !== "casting").map((item) => {
           const Icon = item.icon;
           const active = activeSection === item.section;
 

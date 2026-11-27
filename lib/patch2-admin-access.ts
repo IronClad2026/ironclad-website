@@ -6,8 +6,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 
 const LOOKUP_TIMEOUT_MS = 4_000;
 
-// Deduplicate Clerk lookups within a render. Database authority stays uncached.
-const hasCurrentClerkAdminAuthority = cache(async (userId: string, sessionId: string): Promise<boolean> => {
+async function readCurrentClerkAdminAuthority(userId: string, sessionId: string): Promise<boolean> {
   try {
     const clerk = await clerkClient();
     const authority = await readClerkAuthority(clerk, userId, sessionId);
@@ -20,7 +19,10 @@ const hasCurrentClerkAdminAuthority = cache(async (userId: string, sessionId: st
   } catch {
     return false;
   }
-});
+}
+
+// Deduplicate Clerk lookups within a render. Database authority stays uncached.
+const hasCurrentClerkAdminAuthority = cache(readCurrentClerkAdminAuthority);
 
 async function readClerkAuthority(
   clerk: Awaited<ReturnType<typeof clerkClient>>,
@@ -45,10 +47,12 @@ export async function hasCurrentPatch2AdminAccess(
   sessionClaims: unknown,
   sessionId: string | null,
   requirePlayer = false,
+  { refreshClerkAuthority = false }: { refreshClerkAuthority?: boolean } = {},
 ): Promise<boolean> {
   const role = (sessionClaims as { metadata?: { role?: unknown } } | null)?.metadata?.role;
   if (!userId || !sessionId || role !== "admin") return false;
-  if (!await hasCurrentClerkAdminAuthority(userId, sessionId)) return false;
+  const clerkAuthority = refreshClerkAuthority ? readCurrentClerkAdminAuthority : hasCurrentClerkAdminAuthority;
+  if (!await clerkAuthority(userId, sessionId)) return false;
   try {
     const account = await createSupabaseAdminClient().rpc("get_patch2_admin_account_state", {
       p_clerk_user_id: userId,

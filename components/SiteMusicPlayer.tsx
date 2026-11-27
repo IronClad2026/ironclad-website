@@ -191,6 +191,7 @@ function SiteMusicControls() {
 
   return (
     <aside
+      data-site-music-player=""
       aria-label={t("music.playerLabel")}
       className={
         isCollapsed

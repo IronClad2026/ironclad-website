@@ -5,10 +5,11 @@ import { NewsDate, type NewsCopy } from "@/components/news/NewsCard";
 import type { Locale } from "@/lib/i18n/config";
 import type { OfficialNewsFeed } from "@/lib/news/types";
 
-export default function LatestNews({ feed, copy, locale }: {
+export default function LatestNews({ feed, copy, locale, showArchiveLink = true }: {
   feed: OfficialNewsFeed | null;
   copy: NewsCopy;
   locale: Locale;
+  showArchiveLink?: boolean;
 }) {
   if (!feed?.articles.length) return null;
   return (
@@ -16,7 +17,7 @@ export default function LatestNews({ feed, copy, locale }: {
       <div className="mx-auto w-full max-w-[1120px]">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
           <h2 id="latest-relic-title" className="text-xl font-bold text-white sm:text-2xl">{copy.latestFromRelic}</h2>
-          <Link href="/news" className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-orange-300 hover:text-orange-200 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300">{copy.viewAll}<ArrowRight size={16} aria-hidden="true" /></Link>
+          {showArchiveLink && <Link href="/news" className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-orange-300 hover:text-orange-200 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300">{copy.viewAll}<ArrowRight size={16} aria-hidden="true" /></Link>}
         </div>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {feed.articles.slice(0, 2).map((article) => (

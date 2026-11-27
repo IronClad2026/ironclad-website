@@ -1,6 +1,8 @@
 "use client";
 
 import { UserButton } from "@clerk/nextjs";
+import { Mic2 } from "lucide-react";
+import { CASTER_STUDIO_PATH } from "@/lib/caster/routes";
 
 const hiddenDangerElements = {
   navbarButton__danger: {
@@ -11,7 +13,7 @@ const hiddenDangerElements = {
   },
 };
 
-export default function IronCladUserButton() {
+export default function IronCladUserButton({ studioLabel }: { studioLabel?: string } = {}) {
   return (
     <UserButton
       appearance={{
@@ -26,6 +28,12 @@ export default function IronCladUserButton() {
           elements: hiddenDangerElements,
         },
       }}
-    />
+    >
+      {studioLabel && (
+        <UserButton.MenuItems>
+          <UserButton.Link href={CASTER_STUDIO_PATH} label={studioLabel} labelIcon={<Mic2 aria-hidden="true" size={16} />} />
+        </UserButton.MenuItems>
+      )}
+    </UserButton>
   );
 }

@@ -10,12 +10,16 @@ export type AccountLegalUpdateGateProps = {
   children: ReactNode;
   copy: AccountLegalUpdateCopy;
   state?: AccountLegalGateState;
+  casterSubmission?: boolean;
+  formError?: "acceptance-required" | "unavailable";
 };
 
 export default async function AccountLegalUpdateGate({
   children,
   copy,
   state,
+  casterSubmission,
+  formError,
 }: AccountLegalUpdateGateProps) {
   const resolvedState = state ?? (await loadAccountLegalGateState());
 
@@ -34,5 +38,5 @@ export default async function AccountLegalUpdateGate({
     );
   }
 
-  return <AccountLegalUpdateShell state={resolvedState} copy={copy} />;
+  return <AccountLegalUpdateShell state={resolvedState} copy={copy} casterSubmission={casterSubmission} formError={formError} />;
 }

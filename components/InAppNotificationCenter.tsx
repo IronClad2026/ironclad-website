@@ -5,6 +5,7 @@ import {
   Bell,
   CheckCircle2,
   ChevronDown,
+  ChevronRight,
   Clock3,
   MessageSquareWarning,
   ShieldAlert,
@@ -85,6 +86,7 @@ export default function InAppNotificationCenter({
     useState(totalCount);
   const [unreadCount, setUnreadCount] = useState(initialUnreadCount);
   const [playerExpanded, setPlayerExpanded] = useState(false);
+  const [deviceAlertsExpanded, setDeviceAlertsExpanded] = useState(false);
   const [adminModalOpen, setAdminModalOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(
     initialNotifications[0]?.id ?? null
@@ -544,18 +546,32 @@ export default function InAppNotificationCenter({
     <section
       className={`overflow-hidden border ${dashboardPresentation ? "border-white/12 bg-zinc-950/75" : "rounded-3xl border-orange-500/20 bg-[linear-gradient(135deg,rgba(249,115,22,0.08),rgba(255,255,255,0.035))] shadow-xl shadow-black/20 backdrop-blur"} ${className}`}
     >
-      <button
+      {dashboardPresentation ? (
+        <div className="flex min-h-12 flex-wrap items-center justify-between gap-x-2 px-3.5">
+          <h2 className="py-2 text-base font-bold text-[#f4f0e8]">{title}</h2>
+          <button
+            type="button"
+            aria-expanded={playerExpanded}
+            onClick={() => setPlayerExpanded((current) => !current)}
+            className="inline-flex min-h-11 items-center gap-1 rounded-sm text-xs font-semibold text-orange-200 hover:text-white focus-visible:outline-2 focus-visible:outline-orange-300"
+          >
+            {playerExpanded ? "Close inbox" : "Open inbox"}
+            <ChevronRight aria-hidden size={15} />
+            <span className="sr-only">{t("center.totalSummary", { total: displayTotalCount, unread: displayUnreadCount })}</span>
+          </button>
+        </div>
+      ) : <button
         type="button"
         onClick={() => setPlayerExpanded((current) => !current)}
         aria-expanded={playerExpanded}
-        className={`flex min-h-14 w-full flex-wrap items-center justify-between gap-3 text-left transition hover:bg-white/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-orange-300 ${dashboardPresentation ? "p-4" : "p-6"}`}
+        className="flex min-h-14 w-full flex-wrap items-center justify-between gap-3 p-6 text-left transition hover:bg-white/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-orange-300"
       >
         <span className="flex min-w-0 items-center gap-4">
           <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-orange-400/30 bg-orange-500/10 text-orange-300">
             <Bell className="h-6 w-6" />
           </span>
           <span className="min-w-0">
-            <span className={`block font-bold text-white ${dashboardPresentation ? "text-lg" : "text-xl"}`}>{title}</span>
+            <span className="block text-xl font-bold text-white">{title}</span>
             <span className="mt-1 block text-xs font-semibold text-zinc-400">
               {t("center.totalSummary", {
                 total: displayTotalCount,
@@ -569,27 +585,26 @@ export default function InAppNotificationCenter({
             playerExpanded ? "rotate-180" : ""
           }`}
         />
-      </button>
+      </button>}
 
       {dashboardPresentation && !playerExpanded && (
-        <div className="border-t border-white/10 px-4 pb-3">
+        <div className="border-t border-white/10 px-3.5">
           {visibleError && <p role="alert" className="mt-3 border-l-2 border-red-400 bg-red-500/10 p-3 text-sm text-red-200">{visibleError}</p>}
           {notifications.length === 0 ? (
             <p className="py-3 text-sm leading-5 text-zinc-400">{emptyMessage}</p>
           ) : (
             <ol className="divide-y divide-white/10">
-              {notifications.slice(0, 2).map((notification) => (
+              {notifications.slice(0, 1).map((notification) => (
                 <li key={notification.id}>
                   <button
                     type="button"
                     disabled={pending}
                     onClick={() => handlePlayerNotificationClick(notification)}
-                    className="flex min-h-11 w-full items-start gap-2 py-3 text-left transition hover:text-orange-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300 disabled:opacity-60"
+                    className="flex min-h-11 w-full items-center gap-2 py-2 text-left transition hover:text-orange-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300 disabled:opacity-60"
                   >
                     {notification.readAt === null && <span aria-hidden="true" className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-orange-400" />}
                     <span className="min-w-0">
                       <span className="block break-words text-sm font-semibold text-zinc-200">{notification.title}</span>
-                      <span className="mt-1 line-clamp-2 block text-xs leading-5 text-zinc-400">{notification.message}</span>
                       {notification.readAt === null && <span className="sr-only">{t("center.new")}</span>}
                     </span>
                   </button>
@@ -609,7 +624,7 @@ export default function InAppNotificationCenter({
             className="border-t border-white/10"
           >
             <div className="space-y-3 p-4 sm:p-5">
-              <NotificationPermissionControl />
+              {!dashboardPresentation && <NotificationPermissionControl />}
 
               {visibleError && (
                 <div
@@ -684,6 +699,16 @@ export default function InAppNotificationCenter({
           </motion.div>
         )}
       </AnimatePresence>
+      {dashboardPresentation && (
+        <details onToggle={(event) => setDeviceAlertsExpanded(event.currentTarget.open)} className="border-t border-white/10 px-3.5">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-sm py-2 text-sm font-semibold text-zinc-200 hover:text-orange-200 focus-visible:outline-2 focus-visible:outline-orange-300">
+            <Bell aria-hidden size={15} className="text-zinc-400" />
+            <span className="flex-1">Device alerts</span>
+            <ChevronDown aria-hidden size={15} />
+          </summary>
+          {deviceAlertsExpanded && <div className="pb-3"><NotificationPermissionControl /></div>}
+        </details>
+      )}
     </section>
   );
 }

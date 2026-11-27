@@ -71,7 +71,7 @@ function renderNotification(expanded: boolean, overrides: Partial<InAppNotificat
       unreadCount={notification.readAt ? 0 : 1}
     />
   );
-  if (expanded) fireEvent.click(screen.getByRole("button", { name: /Updates/i }));
+  if (expanded) fireEvent.click(screen.getByRole("button", { name: /Open inbox/i }));
   return screen.getByRole("button", { name: new RegExp(TITLE, "i") });
 }
 

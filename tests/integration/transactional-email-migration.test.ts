@@ -29,6 +29,15 @@ const compactVercelBypassMigration = vercelBypassMigration
   .toLowerCase()
   .replace(/\s+/g, " ")
   .trim();
+const vercelConfig = JSON.parse(
+  readFileSync(resolve(process.cwd(), "vercel.json"), "utf8")
+) as { crons?: Array<{ path: string; schedule: string }> };
+
+function expectNoDuplicateVercelCron() {
+  for (const job of vercelConfig.crons ?? []) {
+    expect(job.path).not.toMatch(/(?:^|\/)transactional-email(?:[/?#]|$)/i);
+  }
+}
 
 function expectNoVercelEmailScheduler() {
   const configuration = JSON.parse(readFileSync(resolve(process.cwd(), "vercel.json"), "utf8"));
@@ -595,6 +604,7 @@ describe("transactional-email migration contract", () => {
     expect(compactMigration).not.toContain("cron_secret");
     expect(compactMigration).not.toContain("exception when others");
     expectNoVercelEmailScheduler();
+    expectNoDuplicateVercelCron();
   });
 });
 
@@ -711,5 +721,6 @@ describe("transactional-email Vercel protection bypass migration", () => {
       "'select public.invoke_transactional_email_worker();'"
     );
     expectNoVercelEmailScheduler();
+    expectNoDuplicateVercelCron();
   });
 });

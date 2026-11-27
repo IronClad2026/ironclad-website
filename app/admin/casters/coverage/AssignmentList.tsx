@@ -1,0 +1,206 @@
+"use client";
+
+import Link from "next/link";
+import { useActionState, useState } from "react";
+import { casterAdminDate } from "../admin-application-contracts";
+import { casterAdminInput, casterAdminPanel, casterAdminPrimary, casterAdminSecondary } from "../admin-application-styles";
+import { loadCastingHistory, saveCastingAssignment } from "./actions";
+import AssignmentFields, { assignmentUtcInput } from "./AssignmentFields";
+import {
+  conflictWarnings,
+  coverageActionLabels,
+  coverageScopeLabels,
+  coverageStatusLabels,
+  coverageWorkspaceHref,
+  type AdminCoverageAssignment,
+  type CoverageAuditEvent,
+  type CoverageChoices,
+  type CoverageMutation,
+  type CoverageMutationResult,
+} from "./contracts";
+
+export default function AssignmentList({ assignments, choices, scoped }: {
+  assignments: AdminCoverageAssignment[];
+  choices: CoverageChoices | null;
+  scoped: boolean;
+}) {
+  const Heading = scoped ? "h3" : "h2";
+  return (
+    <section className={`${casterAdminPanel} space-y-4`} aria-labelledby="casting-assignments-title">
+      <header className="space-y-1">
+        <Heading id="casting-assignments-title" className="text-lg font-black">{scoped ? "Tournament assignments" : "Casting assignments across tournaments"}</Heading>
+        <p className="text-sm text-zinc-400">Scheduled assignments and verified coverage are tracked separately. Recorded times are in Sydney time.</p>
+      </header>
+      {assignments.length ? (
+        <ul className="space-y-3">
+          {assignments.map((assignment) => (
+            <li id={`assignment-${assignment.id}`} key={assignment.id} className="scroll-mt-28 space-y-4 rounded-xl border border-white/10 bg-black p-4">
+              <AssignmentItem assignment={assignment} choices={choices} scoped={scoped} />
+            </li>
+          ))}
+        </ul>
+      ) : <p className="text-sm text-zinc-300">No casting assignments have been recorded here.</p>}
+    </section>
+  );
+}
+
+function AssignmentItem({ assignment, choices, scoped }: {
+  assignment: AdminCoverageAssignment;
+  choices: CoverageChoices | null;
+  scoped: boolean;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const canManage = scoped || assignment.tournament_available === false;
+  const changeable = assignment.status === "scheduled" || assignment.status === "completed";
+  return (
+    <>
+      <header className="flex min-w-0 flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <h4 className="break-all font-bold">{assignment.caster_display_name || "Official caster"}</h4>
+          <p className="break-words text-sm text-zinc-300">{[assignment.tournament_title, assignment.division_name, assignment.match_label].filter(Boolean).join(" · ")}</p>
+        </div>
+        <div className="flex flex-wrap gap-2 text-xs font-bold">
+          <span className="rounded-md border border-white/15 px-2 py-1 text-zinc-300">{coverageScopeLabels[assignment.scope]}</span>
+          <span className={`rounded-md border px-2 py-1 ${assignment.status === "completed" ? "border-orange-400/35 bg-orange-500/10 text-orange-100" : "border-white/15 text-zinc-200"}`}>
+            {coverageStatusLabels[assignment.status]}
+          </span>
+        </div>
+      </header>
+      <dl className="grid gap-2 text-sm text-zinc-300 sm:grid-cols-2">
+        {assignment.scheduled_at && <div><dt className="text-zinc-400">Scheduled</dt><dd>{casterAdminDate(assignment.scheduled_at)}</dd></div>}
+        {assignment.covered_at && <div><dt className="text-zinc-400">Covered</dt><dd>{casterAdminDate(assignment.covered_at)}</dd></div>}
+        {assignment.verified_at && <div>
+          <dt className="text-zinc-400">Verified</dt>
+          <dd>{casterAdminDate(assignment.verified_at)}{assignment.verified_by && <span className="block break-all text-xs">{assignment.verified_by}</span>}</dd>
+        </div>}
+      </dl>
+      {!assignment.target_available && <p className="text-sm text-orange-200">The original competition target is unavailable. This record keeps its original attribution.</p>}
+      {changeable && assignment.conflict && assignment.conflict !== "none" && <p className="text-sm text-orange-200">{conflictWarnings[assignment.conflict]}</p>}
+      {assignment.own_match_reason && <p className="whitespace-pre-wrap break-words text-sm text-zinc-300"><strong>Recorded own-match exception</strong> {assignment.own_match_reason}</p>}
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm font-bold text-orange-200">
+        {assignment.broadcast_url && <a className="inline-flex min-h-11 items-center underline" href={assignment.broadcast_url} rel="noreferrer">Broadcast</a>}
+        {assignment.recording_url && <a className="inline-flex min-h-11 items-center underline" href={assignment.recording_url} rel="noreferrer">Recording</a>}
+        {assignment.media_url && <a className="inline-flex min-h-11 items-center underline" href={assignment.media_url} rel="noreferrer">{assignment.media_title || "Tournament Media"}</a>}
+        {!scoped && assignment.tournament_available !== false && (
+          <Link className="inline-flex min-h-11 items-center underline" prefetch={false} href={coverageWorkspaceHref(assignment.tournament_id)}>Open Tournament Casting</Link>
+        )}
+      </div>
+      <details className="border-t border-white/10 pt-2" onToggle={(event) => setExpanded(event.currentTarget.open)}>
+        <summary className="min-h-11 cursor-pointer py-2 font-bold text-orange-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300">
+          {canManage && changeable ? "Manage assignment and view history" : "View assignment history"}
+        </summary>
+        {expanded && <div className="space-y-4">
+          {canManage && changeable && <AssignmentMutation key={`mutation-${assignment.version}`} assignment={assignment} choices={choices} />}
+          <AssignmentHistory key={`history-${assignment.version}`} assignment={assignment.id} />
+        </div>}
+      </details>
+    </>
+  );
+}
+
+function AssignmentMutation({ assignment, choices }: {
+  assignment: AdminCoverageAssignment;
+  choices: CoverageChoices | null;
+}) {
+  const options: CoverageMutation[] = assignment.status === "completed"
+    ? ["correct", "cancel", "unfulfilled"]
+    : assignment.target_available && choices ? ["update", "complete", "cancel", "unfulfilled"] : ["cancel", "unfulfilled"];
+  const [action, setAction] = useState<CoverageMutation>(options[0]);
+  const [values, setValues] = useState({
+    scheduled: assignmentUtcInput(assignment.scheduled_at),
+    covered: assignmentUtcInput(assignment.covered_at),
+    broadcast: assignment.broadcast_url ?? "",
+    recording: assignment.recording_url ?? "",
+    media: assignment.media_id ?? "",
+  });
+  const [reason, setReason] = useState("");
+  const [acknowledgement, setAcknowledgement] = useState(false);
+  const [confirm, setConfirm] = useState(false);
+  const [result, submit, pending] = useActionState<CoverageMutationResult, FormData>(saveCastingAssignment, { kind: "idle" });
+  const editLinks = action === "update" || action === "complete" || action === "correct";
+  const ownMatch = (action === "update" || action === "complete") && !assignment.own_match_reason &&
+    (assignment.conflict === "own_match" || result.code === "own_match_ack_required");
+  const requiresReason = ownMatch || action === "correct" || action === "cancel" || action === "unfulfilled";
+  const retracts = assignment.status === "completed" && (action === "cancel" || action === "unfulfilled");
+  return (
+    <form action={submit} className="space-y-3 rounded-xl border border-white/10 p-4">
+      <input type="hidden" name="assignment" value={assignment.id} />
+      <input type="hidden" name="version" value={assignment.version} />
+      <label className="block space-y-1 text-sm font-bold">
+        <span>Assignment action</span>
+        <select name="action" className={casterAdminInput} value={action}
+          onChange={(event) => { setAction(event.target.value as CoverageMutation); setConfirm(false); }}>
+          {options.map((option) => <option key={option} value={option}>{coverageActionLabels[option]}</option>)}
+        </select>
+      </label>
+      {action === "update" && <p className="text-sm text-zinc-400">To change the caster or assignment scope, cancel this assignment and schedule a replacement.</p>}
+      {editLinks && <AssignmentFields value={values} onChange={setValues} choices={choices} match={assignment.match_id}
+        mode={action === "update" ? "scheduled" : action === "complete" ? "complete" : "correct"} />}
+      {retracts && <p className="text-sm text-orange-200">This removes effective verified coverage. The original verification remains in the audit history.</p>}
+      {ownMatch && <label className="flex min-h-11 items-start gap-2 text-sm text-orange-200">
+        <input required className="mt-1 size-4 shrink-0 accent-orange-500" type="checkbox" name="acknowledge" value="yes"
+          checked={acknowledgement} onChange={(event) => setAcknowledgement(event.target.checked)} />
+        <span>{conflictWarnings.own_match} I acknowledge the conflict and approve an operational exception.</span>
+      </label>}
+      {requiresReason && <label className="block space-y-1 text-sm font-bold">
+        <span>{ownMatch ? "Exception reason" : "Decision reason"}</span>
+        <textarea name="reason" className={casterAdminInput} maxLength={2000} required value={reason} onChange={(event) => setReason(event.target.value)} />
+      </label>}
+      <label className="flex min-h-11 items-center gap-2 text-sm">
+        <input className="size-4 shrink-0 accent-orange-500" type="checkbox" name="confirm" value="yes" required
+          checked={confirm} onChange={(event) => setConfirm(event.target.checked)} />
+        {action === "complete" ? "I confirm this caster completed coverage at the recorded scope." : "I confirm this assignment decision."}
+      </label>
+      {result.message && <p role={result.kind === "error" ? "alert" : "status"} className="text-sm text-orange-200">{result.message}</p>}
+      <button className={casterAdminPrimary} disabled={pending || !confirm}>
+        {pending ? "Saving…" : coverageActionLabels[action]}
+      </button>
+    </form>
+  );
+}
+
+function AssignmentHistory({ assignment }: { assignment: string }) {
+  const [trail, load, pending] = useActionState(loadCastingHistory, { kind: "idle" });
+  return (
+    <div className="space-y-2">
+      <form action={load}>
+        <input type="hidden" name="assignment" value={assignment} />
+        <button className={casterAdminSecondary} disabled={pending}>
+          {pending ? "Loading audit history…" : trail.kind === "ok" ? "Refresh audit history" : "Load audit history"}
+        </button>
+      </form>
+      {trail.message && <p role="alert" className="text-sm text-orange-200">{trail.message}</p>}
+      {trail.events?.length ? <ol className="space-y-2">{trail.events.map((event) => <AuditEntry key={event.id} event={event} />)}</ol> : null}
+      {trail.kind === "ok" && !trail.events?.length && <p className="text-sm text-zinc-400">No audit entries were returned.</p>}
+    </div>
+  );
+}
+
+function AuditEntry({ event }: { event: CoverageAuditEvent }) {
+  const changes = [
+    ["status", "Status"], ["scheduled_at", "Scheduled time"], ["covered_at", "Coverage date"], ["verified_at", "Verification"],
+    ["broadcast_url", "Broadcast URL"], ["recording_url", "Recording URL"], ["media_id", "Tournament Media"],
+  ].flatMap(([field, label]) => {
+    const previous = event.previous?.[field];
+    const current = event.current?.[field];
+    if (previous === current || (previous === undefined && current === null)) return [];
+    return [{ field, label, previous: historyValue(field, previous), current: historyValue(field, current) }];
+  });
+  return (
+    <li className="space-y-1 rounded-xl border border-white/10 p-3 text-sm">
+      <p className="font-bold">{event.action === "create" ? "Schedule assignment" : coverageActionLabels[event.action]}</p>
+      <p className="break-all text-xs text-zinc-400">{casterAdminDate(event.created_at)} · {event.actor}</p>
+      {event.reason && <p className="whitespace-pre-wrap break-words text-zinc-200">{event.reason}</p>}
+      {changes.length > 0 && <ul className="space-y-1 text-xs text-zinc-300">{changes.map(({ field, label, previous, current }) => (
+        <li className="break-all" key={field}><strong>{label}</strong> {previous} → {current}</li>
+      ))}</ul>}
+    </li>
+  );
+}
+
+function historyValue(field: string, value: unknown) {
+  if (typeof value !== "string") return "—";
+  if (field.endsWith("_at")) return casterAdminDate(value);
+  if (field === "status" && Object.hasOwn(coverageStatusLabels, value)) return coverageStatusLabels[value as keyof typeof coverageStatusLabels];
+  return value;
+}

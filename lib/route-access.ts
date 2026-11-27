@@ -1,3 +1,5 @@
+export { casterRouteAccess } from "@/lib/caster/routes";
+
 const PUBLIC_ROUTE_ROOTS = [
   "/sign-in",
   "/sign-up",
@@ -21,6 +23,9 @@ const SELF_AUTHENTICATED_EXACT_API_PATHS = [
   "/api/internal/transactional-email",
   "/api/notifications/click",
   "/api/partners/v1/tournaments",
+  "/api/ready",
+  "/api/ready/suggestions",
+  "/api/ready/usage",
 ] as const;
 
 export function isPublicPathname(pathname: string) {

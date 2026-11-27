@@ -20,10 +20,12 @@ import {
 
 export default function TournamentWorkspaceHeader({
   activeSection,
+  castingEnabled,
   summary,
   tournament,
 }: {
   activeSection: TournamentManagementSection;
+  castingEnabled?: boolean;
   summary: AdminTournamentWorkspaceSummary;
   tournament: AdminTournamentWorkspaceRow;
 }) {
@@ -82,6 +84,7 @@ export default function TournamentWorkspaceHeader({
         <TournamentManagementMenu
           key={tournament.id}
           activeSection={activeSection}
+          castingEnabled={castingEnabled}
           tournamentId={tournament.id}
         />
       </div>
@@ -108,6 +111,7 @@ export default function TournamentWorkspaceHeader({
 
       <TournamentDesktopSectionNavigation
         activeSection={activeSection}
+        castingEnabled={castingEnabled}
         tournamentId={tournament.id}
       />
     </header>
@@ -128,6 +132,7 @@ const TOURNAMENT_MANAGEMENT_LABELS: Record<
   matches: "Matches / Results",
   replays: "Replay Archive",
   media: "Media",
+  casting: "Casting",
   "map-pool": "Map Pool",
   controls: "Tournament Controls",
 };

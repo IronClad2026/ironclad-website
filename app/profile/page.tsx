@@ -1,5 +1,6 @@
 import { getDivisionModelForCalculationVersion } from "@/lib/division-model";
 import { auth } from "@clerk/nextjs/server";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import PlayerProfileForm from "@/components/PlayerProfileForm";
 import DeleteAccountSection from "@/components/DeleteAccountSection";
@@ -18,6 +19,7 @@ import { loadDictionary } from "@/lib/i18n/loaders";
 import { getGamingProfilePublicationCopy } from "@/lib/i18n/gaming-profile-publication";
 import { getRequestLocale } from "@/lib/i18n/request";
 import { translate } from "@/lib/i18n/translate";
+import { isReadyWardrobePilotEnabled } from "@/lib/wardrobe/environment";
 
 type SteamConnectionResult =
   | "connected"
@@ -302,6 +304,12 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
                 ? t("profilePage.completeStatus")
                 : t("profilePage.requiredStatus")}
             </div>
+            {isReadyWardrobePilotEnabled() && (
+              <Link href="/profile/ready" prefetch={false}
+                className="mt-4 flex w-fit min-h-11 items-center font-semibold text-orange-300 underline">
+                Ready Wardrobe
+              </Link>
+            )}
           </div>
         </div>
 

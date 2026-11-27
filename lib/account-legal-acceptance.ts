@@ -74,6 +74,12 @@ export async function loadAccountLegalGateState(): Promise<AccountLegalGateState
   return runtime.accountGate;
 }
 
+/** Server-only adapter for Proxy, where Clerk has already resolved the session subject. */
+export async function loadAccountLegalGateStateForSubject(userId: string): Promise<AccountLegalGateState> {
+  const runtime = await loadLegalRuntimeStateForSubject(userId, false);
+  return runtime.accountGate;
+}
+
 export async function loadAccountLegalRuntimeState({
   includeAnalytics,
 }: {
@@ -97,6 +103,13 @@ async function loadLegalRuntimeState(
     };
   }
 
+  return loadLegalRuntimeStateForSubject(userId, includeAnalytics);
+}
+
+async function loadLegalRuntimeStateForSubject(
+  userId: string | null,
+  includeAnalytics: boolean
+): Promise<AccountLegalRuntimeState> {
   if (!userId && !includeAnalytics) {
     return anonymousRuntime();
   }

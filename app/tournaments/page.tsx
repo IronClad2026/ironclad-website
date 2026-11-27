@@ -2,6 +2,8 @@ import { requireDivisionModelVersion } from "@/lib/division-model";
 import { auth } from "@clerk/nextjs/server";
 import type { Metadata } from "next";
 import TournamentsExperience from "@/components/TournamentsExperience";
+import type { CasterCoverageAssignment } from "@/lib/caster/coverage";
+import { loadPublicCasterSchedules } from "@/lib/caster/coverage-server";
 import { loadEffectiveRegistrationDocumentSet } from "@/lib/legal-documents";
 import { loadTournamentPollsForRequest } from "@/lib/player-polls";
 import { loadMatchResultData } from "@/lib/match-result-data";
@@ -210,7 +212,7 @@ export default async function TournamentsPage({
       .filter((bracket) => bracket.map_pool_published_at !== null)
       .map((bracket) => bracket.id)
   );
-  const [mapPoolEntryResult, tournamentMediaResult] = await Promise.all([
+  const [mapPoolEntryResult, tournamentMediaResult, casterCoverage] = await Promise.all([
     publishedMapPoolBracketIds.length > 0
       ? supabase
           .from("tournament_bracket_map_pool_entries")
@@ -235,6 +237,7 @@ export default async function TournamentsPage({
           .order("created_at", { ascending: false })
           .order("id", { ascending: false })
       : Promise.resolve({ data: [], error: null }),
+    loadPublicCasterSchedules([...includedTournamentIds]),
   ]);
 
   if (mapPoolEntryResult.error) {
@@ -271,6 +274,12 @@ export default async function TournamentsPage({
   }
 
   const mediaByTournament = new Map<string, TournamentMediaItem[]>();
+  const casterCoverageByTournament = new Map<string, CasterCoverageAssignment[]>();
+  for (const assignment of casterCoverage) {
+    const items = casterCoverageByTournament.get(assignment.tournament_id) ?? [];
+    items.push(assignment);
+    casterCoverageByTournament.set(assignment.tournament_id, items);
+  }
 
   for (const media of sortTournamentMediaNewestFirst(
     parsedTournamentMedia.map(mapTournamentMediaAdminItem)
@@ -541,6 +550,7 @@ export default async function TournamentsPage({
       );
     tournament.generatedBrackets = generatedByTournament.get(row.id) ?? [];
     tournament.media = mediaByTournament.get(row.id) ?? [];
+    tournament.casterCoverage = casterCoverageByTournament.get(row.id);
     tournament.mapPools = projectPublishedTournamentMapPools(
       (row.tournament_brackets ?? []).map((bracket) => ({
         id: bracket.id,

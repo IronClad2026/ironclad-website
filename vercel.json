@@ -1,6 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "regions": ["sin1"],
+  "git": { "deploymentEnabled": { "codex/ironclad-combined-release": false } },
   "crons": [
     {
       "path": "/api/cron/combat-highlights-cleanup",

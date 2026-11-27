@@ -134,7 +134,7 @@ describe("notification-center mutation reliability", () => {
   it("renders a dashboard update preview without marking anything read", () => {
     render(<InAppNotificationCenter scope="player" presentation="dashboard" title="Updates" description="Recent updates." emptyMessage="No updates." notifications={[notification()]} totalCount={4} unreadCount={3} />);
     expect(screen.getByText("Registration Rejected")).toBeVisible();
-    expect(screen.getByRole("button", { name: /Updates/i })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByRole("button", { name: /Open inbox/i })).toHaveAttribute("aria-expanded", "false");
     expect(markReadMock).not.toHaveBeenCalled();
     expect(markAllMock).not.toHaveBeenCalled();
     expect(markSelectedMock).not.toHaveBeenCalled();

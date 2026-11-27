@@ -31,12 +31,15 @@ type ViewerClient = Awaited<ReturnType<typeof createAuthenticatedSupabaseClient>
 const LOOKUP_TIMEOUT_MS = 4_000;
 const RPC_TIMEOUT_MS = 8_000;
 
-export async function loadTournamentPollsForRequest(tournamentIds: string[]): Promise<TournamentPollLoadResult> {
+export async function loadTournamentPollsForRequest(tournamentIds: string[], includePrivate = true): Promise<TournamentPollLoadResult> {
   const snapshotsByTournament: Record<string, PollListSnapshot> = {};
   const pollsByTournament: Record<string, PollViewerProjection[]> = {};
   if (tournamentIds.length === 0) return { snapshotsByTournament, pollsByTournament, error: null };
   const diagnostics = createPollDiagnostics("tournament");
-  const viewerPromise = resolveViewer(diagnostics);
+  const viewerPromise = includePrivate ? resolveViewer(diagnostics) : Promise.resolve({
+    context: { userId: null, sessionId: null }, accountState: "anonymous" as const,
+    client: null, part: { status: "not_applicable" as const },
+  });
   let publicClient: ReturnType<typeof createNoStoreSupabaseClient> | null = null;
   try { publicClient = createNoStoreSupabaseClient(); }
   catch { diagnostics("client", "public", "acquisition"); }

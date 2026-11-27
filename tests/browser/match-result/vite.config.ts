@@ -13,6 +13,8 @@ export default defineConfig({
       ...[
         "@/app/tournaments/match-actions",
         "@/app/tournaments/support-actions",
+        "@/app/tournaments/private-assistance-actions",
+        "@/app/admin/tournaments/assistance-actions",
         "@/lib/supabase-browser",
         "@clerk/nextjs",
         "next/navigation",
@@ -20,5 +22,7 @@ export default defineConfig({
       { find: "@", replacement: root },
     ],
   },
+  envDir: resolve(import.meta.dirname, "no-environment-files"),
+  envPrefix: "MATCH_RESULT_FIXTURE_UNUSED_",
   server: { host: "127.0.0.1", port: 3127, strictPort: true },
 });

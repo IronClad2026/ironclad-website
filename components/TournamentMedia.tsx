@@ -1,7 +1,8 @@
 "use client";
 
 import { ExternalLink, PlayCircle } from "lucide-react";
-import { useOptionalTranslations } from "@/components/i18n/LocaleProvider";
+import { CasterCoverageList, selectPublicCasterCoverage } from "@/components/caster/CasterCoverage";
+import { useOptionalLocale, useOptionalTranslations } from "@/components/i18n/LocaleProvider";
 import competitionEnglish from "@/lib/i18n/dictionaries/en/competition";
 import type { TournamentMediaType } from "@/lib/tournament-media";
 import type { TournamentCard } from "@/lib/tournaments";
@@ -21,7 +22,9 @@ export default function TournamentMedia({
   presentation: "desktop" | "mobile";
 }) {
   const t = useOptionalTranslations("competition", competitionEnglish);
+  const locale = useOptionalLocale();
   const media = tournament.media ?? [];
+  const coverage = selectPublicCasterCoverage(tournament.casterCoverage ?? []);
 
   return (
     <div
@@ -31,6 +34,12 @@ export default function TournamentMedia({
       <h2 className="break-words text-xl font-black text-white">
         {tournament.title} — {t("tournaments.media.title")}
       </h2>
+
+      {coverage.length ? (
+        <div className="mt-5" data-caster-tournament-coverage={tournament.id}>
+          <CasterCoverageList records={coverage} locale={locale} mode="schedule" headingLevel={3} />
+        </div>
+      ) : null}
 
       {media.length > 0 ? (
         <ul
@@ -79,11 +88,11 @@ export default function TournamentMedia({
             </li>
           ))}
         </ul>
-      ) : (
+      ) : coverage.length === 0 ? (
         <p className="mt-5 border border-white/12 p-8 text-center text-zinc-400">
           {t("tournaments.media.empty")}
         </p>
-      )}
+      ) : null}
     </div>
   );
 }

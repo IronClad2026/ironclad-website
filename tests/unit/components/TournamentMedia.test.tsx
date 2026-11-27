@@ -145,4 +145,23 @@ describe("TournamentMedia", () => {
     ).toBeInTheDocument();
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
   });
+
+  it("keeps tournament-wide broadcasts beside the existing published media library", () => {
+    const tournament = buildTournament();
+    const assignment = {
+      id: "scheduled-tournament", version: 1, scope: "tournament", status: "scheduled", tournament_id: tournament.id,
+      tournament_title: tournament.title, tournament_slug: tournament.slug, game: tournament.game, division_id: null,
+      division_name: null, match_id: null, match_label: null, scheduled_at: null, covered_at: null, verified_at: null,
+      target_available: true, broadcast_url: "https://www.twitch.tv/ironclad", recording_url: null,
+      caster: { slug: "caster-fixture", display_name: "Caster Fixture", publication_id: "pub", avatar: "avatar" },
+    } as const;
+    tournament.casterCoverage = [assignment, { ...assignment, id: "scheduled-match", scope: "match", match_id: "match-1" }];
+    render(<TournamentMedia presentation="desktop" tournament={tournament} />);
+
+    expect(screen.getByRole("region", { name: "Official Caster Coverage" })).toBeVisible();
+    expect(screen.getByRole("link", { name: /Caster Fixture/ })).toHaveAttribute("href", "/casters/caster-fixture");
+    expect(screen.getByRole("link", { name: "Watch broadcast" })).toHaveAttribute("href", "https://www.twitch.tv/ironclad");
+    expect(screen.getByRole("link", { name: "Watch: Grand Final Cast. Opens in a new tab" })).toBeVisible();
+    expect(screen.queryByText("Match", { exact: true })).toBeNull();
+  });
 });

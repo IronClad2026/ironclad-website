@@ -21,6 +21,8 @@ const eslintConfig = defineConfig([
     "test-results/**",
     ".playwright/**",
     "next-env.d.ts",
+    // Three.js files are the approved upstream browser artifacts.
+    "public/mascot-v6/vendor/**",
   ]),
 ]);
 

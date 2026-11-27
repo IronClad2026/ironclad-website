@@ -3,17 +3,20 @@
 import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { ChevronDown } from "lucide-react";
+import { CASTER_DIRECTORY_PATH } from "@/lib/caster/publication";
 
 type NavbarMoreMenuProps = {
   label: string;
   aboutLabel: string;
   active: boolean;
+  casters?: { label: string; active: boolean };
 };
 
 export default function NavbarMoreMenu({
   label,
   aboutLabel,
   active,
+  casters,
 }: NavbarMoreMenuProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -68,7 +71,7 @@ export default function NavbarMoreMenu({
             else setOpen(true);
           }
         }}
-        className={`inline-flex min-h-11 items-center gap-1 whitespace-nowrap transition hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300 ${active ? "font-bold text-orange-300" : "text-zinc-300"}`}
+        className={`inline-flex min-h-11 items-center gap-1 whitespace-nowrap transition hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300 ${active || casters?.active ? "font-bold text-orange-300" : "text-zinc-300"}`}
       >
         {label}
         <ChevronDown size={14} aria-hidden="true" className={open ? "rotate-180" : ""} />
@@ -87,6 +90,13 @@ export default function NavbarMoreMenu({
           >
             {aboutLabel}
           </Link>
+          {casters && (
+            <Link href={CASTER_DIRECTORY_PATH} aria-current={casters.active ? "page" : undefined}
+              onClick={() => setOpen(false)}
+              className="flex min-h-11 items-center px-3 py-2 text-zinc-200 transition hover:bg-white/5 hover:text-orange-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-300">
+              {casters.label}
+            </Link>
+          )}
         </div>
       ) : null}
     </div>

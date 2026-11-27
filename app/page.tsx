@@ -1,5 +1,8 @@
 import HomeAccountSection from "@/components/HomeAccountSection";
 import HomeCollaborationSection from "@/components/HomeCollaborationSection";
+import CasterHomeAnnouncements from "@/components/caster/CasterHomeAnnouncements";
+import CasterPublicHomeShell from "@/components/caster/CasterPublicHomeShell";
+import CasterShowcaseSection from "@/components/caster/CasterShowcaseSection";
 import LatestNewsSection from "@/components/news/LatestNewsSection";
 import { Suspense } from "react";
 import ScrollReveal from "@/components/ScrollReveal";
@@ -16,6 +19,14 @@ import {
 
 } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
+import { headers } from "next/headers";
+import { isCasterProgramEnabled } from "@/lib/caster/environment";
+import { getCasterProfileCopy } from "@/lib/caster/profile-copy";
+import { getPublicCasterCopy } from "@/lib/caster/public-copy";
+import { CASTER_DIRECTORY_PATH } from "@/lib/caster/publication";
+import { CASTER_CHROME_HEADER, CASTER_PUBLIC_HOME_CHROME, CASTER_STUDIO_PATH } from "@/lib/caster/routes";
+import type { Locale } from "@/lib/i18n/config";
 import { loadDictionary } from "@/lib/i18n/loaders";
 import { getRequestLocale } from "@/lib/i18n/request";
 import { translate } from "@/lib/i18n/translate";
@@ -88,8 +99,11 @@ const platformSignals = [
 ];
 
 export default async function Home() {
-  const locale = await getRequestLocale();
+  const [locale, requestHeaders] = await Promise.all([getRequestLocale(), headers()]);
   const copy = await loadDictionary(locale, "public");
+  if (isCasterProgramEnabled() && requestHeaders.get(CASTER_CHROME_HEADER) === CASTER_PUBLIC_HOME_CHROME) {
+    return <CasterPublicHome locale={locale} copy={copy} />;
+  }
 
   return (
     <main className="min-h-screen overflow-hidden bg-black text-white">
@@ -101,12 +115,53 @@ export default async function Home() {
         <LatestNewsSection copy={copy.news} locale={locale} />
       </Suspense>
       <HomeCollaborationSection copy={copy.home.collaboration} />
+      <Suspense fallback={null}>
+        <CasterShowcaseSection locale={locale} />
+      </Suspense>
     </main>
   );
 }
 
-function HeroSection({ copy }: { copy: PublicDictionary }) {
+async function CasterPublicHome({ locale, copy }: { locale: Locale; copy: PublicDictionary }) {
+  const common = await loadDictionary(locale, "common");
+  const casterCopy = getPublicCasterCopy(locale);
+  const navClass = "inline-flex min-h-11 items-center px-2 text-sm font-bold text-zinc-200 hover:text-orange-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300";
+  const links = [
+    { href: CASTER_DIRECTORY_PATH, label: casterCopy.directory },
+    { href: "#public-home-announcements", label: common.nav.announcements },
+    { href: CASTER_STUDIO_PATH, label: getCasterProfileCopy(locale).title },
+    { href: "/terms", label: common.footer.terms },
+    { href: "/privacy", label: common.footer.privacy },
+  ];
+  return (
+    <CasterPublicHomeShell>
+      <header className="border-b border-white/10 bg-black px-5 text-white sm:px-8">
+        <nav aria-label={common.nav.primaryNavigation} className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-x-4 py-3">
+          <Image src="/images/ironclad-logo.png" alt="IronClad" width={1365} height={768} sizes="120px" priority className="h-12 w-auto shrink-0" />
+          <ul className="flex flex-wrap items-center gap-x-2">
+            {links.map(({ href, label }) => <li key={href}><a className={navClass} href={href}>{label}</a></li>)}
+          </ul>
+        </nav>
+      </header>
+      <main className="min-h-screen overflow-hidden bg-black text-white" data-caster-public-home>
+        <HeroSection copy={copy} casterDirectoryLabel={casterCopy.browse} />
+        <Suspense fallback={null}>
+          <CasterHomeAnnouncements locale={locale} copy={copy.announcements} />
+        </Suspense>
+        <Suspense fallback={null}>
+          <LatestNewsSection copy={copy.news} locale={locale} showArchiveLink={false} />
+        </Suspense>
+        <Suspense fallback={null}>
+          <CasterShowcaseSection locale={locale} documentNavigation />
+        </Suspense>
+      </main>
+    </CasterPublicHomeShell>
+  );
+}
+
+function HeroSection({ copy, casterDirectoryLabel }: { copy: PublicDictionary; casterDirectoryLabel?: string }) {
   const t = (path: string) => translate(copy, path);
+  const PrimaryLink = casterDirectoryLabel ? "a" : Link;
 
   return (
     <section
@@ -133,6 +188,7 @@ function HeroSection({ copy }: { copy: PublicDictionary }) {
 
           <h1
             id="home-hero-title"
+            data-mascot-attention="home-heading"
             className="mt-5 max-w-5xl text-5xl font-black leading-[0.96] text-white sm:text-6xl lg:text-8xl"
           >
             {t("home.hero.title")}
@@ -143,15 +199,16 @@ function HeroSection({ copy }: { copy: PublicDictionary }) {
           </p>
 
           <div className="mt-9 flex w-full min-w-0 max-w-full flex-col gap-3 sm:flex-row">
-            <Link
+            <PrimaryLink
               className="inline-flex min-h-12 w-full min-w-0 max-w-full items-center justify-center gap-2 border border-orange-400 bg-orange-500 px-5 py-3 text-sm font-black text-black transition hover:border-orange-300 hover:bg-orange-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300 sm:w-auto"
-              href="/tournaments"
+              href={casterDirectoryLabel ? CASTER_DIRECTORY_PATH : "/tournaments"}
+              data-mascot-attention={casterDirectoryLabel ? undefined : "view-tournaments"}
             >
               <span className="min-w-0 text-center leading-5 [overflow-wrap:anywhere]">
-                {t("home.hero.viewTournaments")}
+                {casterDirectoryLabel ?? t("home.hero.viewTournaments")}
               </span>
               <ArrowRight className="shrink-0" size={17} aria-hidden="true" />
-            </Link>
+            </PrimaryLink>
 
             <a
               className="inline-flex min-h-12 w-full min-w-0 max-w-full items-center justify-center gap-2 border border-white/20 bg-white/[0.035] px-5 py-3 text-sm font-black text-white backdrop-blur transition hover:border-orange-300/70 hover:bg-orange-500/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300 sm:w-auto"

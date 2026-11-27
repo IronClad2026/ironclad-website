@@ -1,8 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { unstable_doesMiddlewareMatch as doesProxyMatch } from "next/experimental/testing/server";
 
 const clerkMiddlewareMock = vi.hoisted(() =>
-  vi.fn((handler: unknown) => handler),
+  vi.fn((handler: (auth: unknown, request: unknown) => unknown) =>
+    (request: unknown, event: { auth: unknown }) => handler(event.auth, request)),
 );
 
 vi.mock("@clerk/nextjs/server", () => ({
@@ -16,20 +17,24 @@ type ProxyAuth = {
 };
 
 type ProxyRequest = {
+  method?: string;
   nextUrl: {
     pathname: string;
   };
 };
 
-const proxyHandler = proxy as unknown as (
-  auth: ProxyAuth,
+const invokeProxy = proxy as unknown as (
   request: ProxyRequest,
+  event: { auth: ProxyAuth },
 ) => Promise<void>;
+const proxyHandler = (auth: ProxyAuth, request: ProxyRequest) => invokeProxy(request, { auth });
 
 describe("Next.js proxy authorization", () => {
   beforeEach(() => {
     clerkMiddlewareMock.mockClear();
   });
+
+  afterEach(() => vi.unstubAllEnvs());
 
   it.each([
     "/",
@@ -104,6 +109,26 @@ describe("Next.js proxy authorization", () => {
     await proxyHandler({ protect }, { nextUrl: { pathname } });
 
     expect(protect).toHaveBeenCalledOnce();
+  });
+
+  it("allows only the two exact Ready model asset reads on Staging", async () => {
+    for (const [key, value] of Object.entries({
+      VERCEL_ENV: "preview", VERCEL_GIT_COMMIT_REF: "staging",
+      NEXT_PUBLIC_SUPABASE_URL: "https://zzbnneprhjicmajpjkdg.supabase.co",
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_example", CLERK_SECRET_KEY: "sk_test_example",
+      PATCH2_PUBLIC_PROFILE_NOTICE_ENABLED: "false",
+    })) vi.stubEnv(key, value);
+    const protect = vi.fn(async () => undefined);
+    const model = "/mascot-v6/assets/ironclad.glb";
+    const interaction = "/mascot-v6/assets/interaction.json";
+    await proxyHandler({ protect }, { method: "GET", nextUrl: { pathname: model } });
+    await proxyHandler({ protect }, { method: "HEAD", nextUrl: { pathname: interaction } });
+    expect(protect).not.toHaveBeenCalled();
+    await proxyHandler({ protect }, { method: "POST", nextUrl: { pathname: model } });
+    await proxyHandler({ protect }, { method: "GET", nextUrl: { pathname: "/mascot-v6/assets/private.json" } });
+    vi.stubEnv("VERCEL_ENV", "production");
+    await proxyHandler({ protect }, { method: "GET", nextUrl: { pathname: interaction } });
+    expect(protect).toHaveBeenCalledTimes(3);
   });
 
   it("preserves dynamic-route and static-file matcher behavior", () => {

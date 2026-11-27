@@ -71,6 +71,16 @@ describe("Admin desktop sidebar", () => {
     ).not.toHaveAttribute("aria-current");
   });
 
+  it("shows Ready usage in the trial navigation", () => {
+    navigationMock.pathname = "/admin/ready-usage";
+    const { rerender } = render(<AdminSidebar />);
+    expect(screen.queryByRole("link", { name: "Ready usage" })).not.toBeInTheDocument();
+
+    rerender(<AdminSidebar showReadyUsage />);
+    expect(screen.getByRole("link", { name: "Ready usage" })).toHaveAttribute("href", "/admin/ready-usage");
+    expect(screen.getByRole("link", { name: "Ready usage" })).toHaveAttribute("aria-current", "page");
+  });
+
   it.each(["/admin/registrations", "/admin/registrations/registration-123"])(
     "marks the Registrations workspace current for %s",
     (pathname) => {

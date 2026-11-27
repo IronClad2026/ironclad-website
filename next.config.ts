@@ -1,12 +1,19 @@
 import type { NextConfig } from "next";
 import { assertP03PreviewSafety } from "./lib/p03-preview-safety";
 import { assertReleasePreviewSafety } from "./lib/release-preview-safety";
+import { assertCasterBuildEnvironment } from "./lib/caster/environment";
+import { CASTER_INVITATION_FRAME_POLICY } from "./lib/caster/invitation-policy";
+import { assertReadyBuildEnvironment } from "./lib/ready/review-access";
+import { verifyProductionFeatureCredentials } from "./lib/ironclad-release-verification";
 
 assertReleasePreviewSafety();
 assertP03PreviewSafety();
+assertCasterBuildEnvironment();
+assertReadyBuildEnvironment();
 
 const nextConfig: NextConfig = {
   async headers() {
+    await verifyProductionFeatureCredentials();
     return [
       {
         source: "/sw.js",
@@ -50,6 +57,19 @@ const nextConfig: NextConfig = {
             value:
               "camera=(), microphone=(), geolocation=(), payment=()",
           },
+        ],
+      },
+      {
+        source: "/casters/:slug",
+        headers: [
+          { key: "Content-Security-Policy", value: "frame-ancestors 'none'; base-uri 'self'; object-src 'none'; frame-src 'self' https://www.youtube-nocookie.com https://player.twitch.tv https://clips.twitch.tv" },
+        ],
+      },
+      {
+        source: "/casters/invitation",
+        headers: [
+          { key: "Referrer-Policy", value: "no-referrer" },
+          { key: "Content-Security-Policy", value: CASTER_INVITATION_FRAME_POLICY },
         ],
       },
       {

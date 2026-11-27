@@ -1,4 +1,5 @@
 import { PHASE_FOUR_ACTIVE_COHORT_SIZE } from "@/lib/tournament-registration-cohort";
+import type { CasterCoverageAssignment } from "@/lib/caster/coverage";
 import type { PublishedTournamentMapPool } from "@/lib/tournament-map-pools";
 import type { TournamentMediaItem } from "@/lib/tournament-media";
 import type { PublicTournamentDivisionStateResolution } from "@/lib/tournament-division-state";
@@ -121,6 +122,7 @@ export type TournamentCard = {
   rulesUrl: string | null;
   battlefyUrl: string | null;
   media?: TournamentMediaItem[];
+  casterCoverage?: CasterCoverageAssignment[];
   participants: TournamentParticipant[];
   bracketParticipants: TournamentParticipant[];
   generatedBrackets: GeneratedTournamentBracket[];

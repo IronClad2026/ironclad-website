@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import AdminAccessRequired from "@/components/admin/AdminAccessRequired";
 import { hasAdminPageAccess } from "@/lib/admin-page-access";
+import { isCasterProgramEnabled } from "@/lib/caster/environment";
+import CoverageWorkspace from "@/app/admin/casters/coverage/CoverageWorkspace";
 import { loadAdminTournamentMediaWorkspace } from "@/app/admin/tournaments/media-actions";
 import AdminNotificationInbox from "@/components/admin/tournaments/AdminNotificationInbox";
 import AdminPrivateAssistance from "@/components/admin/tournaments/AdminPrivateAssistance";
@@ -76,6 +78,7 @@ const VALID_SECTIONS = new Set<TournamentManagementSection>([
   "matches",
   "replays",
   "media",
+  "casting",
   "map-pool",
   "controls",
 ]);
@@ -95,6 +98,8 @@ export default async function TournamentWorkspacePage({
   }
 
   const section = getSection(query?.section);
+  const castingEnabled = isCasterProgramEnabled();
+  if (section === "casting" && !castingEnabled) notFound();
   const [workspace, independentContent] = await Promise.all([
     loadAdminTournamentWorkspace(tournamentId),
     section === "assistance" || section === "notifications"
@@ -131,6 +136,7 @@ export default async function TournamentWorkspacePage({
       <section className="mx-auto max-w-7xl">
         <TournamentWorkspaceHeader
           activeSection={section}
+          castingEnabled={castingEnabled}
           summary={registrationData
             ? { ...workspace.summary, approvedPlayers: registrationData.counts.approved }
             : workspace.summary}
@@ -422,6 +428,10 @@ async function renderWorkspaceSection({
         loadFailed={!mediaWorkspace}
       />
     );
+  }
+
+  if (section === "casting") {
+    return await CoverageWorkspace({ tournament: tournament.id, page: query?.page });
   }
 
   if (section === "map-pool") {

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useRef } from "react";
 import { acceptAccountLegalUpdate } from "@/app/legal-update-actions";
 import type { AccountLegalAcceptanceActionState } from "@/app/legal-update-actions";
+import { CASTER_LEGAL_PATH, CASTER_SIGN_OUT_PATH } from "@/lib/caster/routes";
 import type {
   AccountLegalGateDocument,
   AccountLegalGateState,
@@ -41,11 +42,15 @@ type RequiredGateState = Extract<AccountLegalGateState, { status: "required" }>;
 type AccountLegalUpdateShellProps = {
   state: RequiredGateState | { status: "unavailable" };
   copy: AccountLegalUpdateCopy;
+  casterSubmission?: boolean;
+  formError?: "acceptance-required" | "unavailable";
 };
 
 export default function AccountLegalUpdateShell({
   state,
   copy,
+  casterSubmission,
+  formError,
 }: AccountLegalUpdateShellProps) {
   const headingRef = useRef<HTMLHeadingElement>(null);
 
@@ -76,9 +81,9 @@ export default function AccountLegalUpdateShell({
         </h1>
 
         {state.status === "unavailable" ? (
-          <UnavailableControls copy={copy} />
+          <UnavailableControls copy={copy} casterSubmission={casterSubmission} formError={formError} />
         ) : (
-          <RequiredAcceptance state={state} copy={copy} />
+          <RequiredAcceptance state={state} copy={copy} casterSubmission={casterSubmission} formError={formError} />
         )}
       </section>
     </main>
@@ -88,15 +93,20 @@ export default function AccountLegalUpdateShell({
 function RequiredAcceptance({
   state,
   copy,
+  casterSubmission,
+  formError,
 }: {
   state: RequiredGateState;
   copy: AccountLegalUpdateCopy;
+  casterSubmission?: boolean;
+  formError?: "acceptance-required" | "unavailable";
 }) {
   const router = useRouter();
   const [actionState, formAction, pending] = useActionState(
     acceptAccountLegalUpdate,
     initialState
   );
+  const messageCode = actionState.code === "idle" ? formError : actionState.code;
 
   useEffect(() => {
     if (actionState.status === "success") {
@@ -121,7 +131,11 @@ function RequiredAcceptance({
         />
       </div>
 
-      <form action={formAction} className="mt-7">
+      <form
+        action={casterSubmission ? CASTER_LEGAL_PATH : formAction}
+        method={casterSubmission ? "post" : undefined}
+        className="mt-7"
+      >
         <input
           type="hidden"
           name="termsDocumentId"
@@ -158,9 +172,9 @@ function RequiredAcceptance({
           </label>
         </fieldset>
 
-        {actionState.status !== "idle" && (
+        {messageCode && (
           <p
-            role={actionState.status === "error" ? "alert" : "status"}
+            role={actionState.status === "success" ? "status" : "alert"}
             aria-live="polite"
             className={`mt-4 border p-4 text-sm ${
               actionState.status === "success"
@@ -168,12 +182,16 @@ function RequiredAcceptance({
                 : "border-red-500/30 bg-red-500/10 text-red-200"
             }`}
           >
-            {getActionMessage(actionState.code, copy)}
+            {getActionMessage(messageCode, copy)}
           </p>
         )}
 
         <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
-          <SignOutControl label={copy.signOutAction} />
+          {casterSubmission ? (
+            <button type="submit" formAction={CASTER_SIGN_OUT_PATH} formMethod="post" formNoValidate className={signOutButtonClass}>
+              {copy.signOutAction}
+            </button>
+          ) : <SignOutControl label={copy.signOutAction} />}
           <button
             type="submit"
             disabled={pending}
@@ -187,7 +205,11 @@ function RequiredAcceptance({
   );
 }
 
-function UnavailableControls({ copy }: { copy: AccountLegalUpdateCopy }) {
+function UnavailableControls({ copy, casterSubmission, formError }: {
+  copy: AccountLegalUpdateCopy;
+  casterSubmission?: boolean;
+  formError?: "acceptance-required" | "unavailable";
+}) {
   const router = useRouter();
 
   return (
@@ -195,8 +217,13 @@ function UnavailableControls({ copy }: { copy: AccountLegalUpdateCopy }) {
       <p className="mt-5 max-w-2xl text-sm leading-7 text-zinc-300 sm:text-base">
         {copy.unavailableDescription}
       </p>
+      {formError === "unavailable" && <p className="mt-4 text-sm text-red-200" role="alert">{copy.unavailableError}</p>}
       <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:justify-end">
-        <SignOutControl label={copy.signOutAction} />
+        {casterSubmission ? (
+          <form action={CASTER_SIGN_OUT_PATH} method="post">
+            <button type="submit" className={signOutButtonClass}>{copy.signOutAction}</button>
+          </form>
+        ) : <SignOutControl label={copy.signOutAction} />}
         <button
           type="button"
           onClick={() => router.refresh()}
@@ -232,13 +259,12 @@ function DocumentLink({
   );
 }
 
+const signOutButtonClass = "min-h-12 border border-white/15 bg-white/[0.035] px-6 py-3 text-sm font-bold text-zinc-200 transition hover:border-white/30 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300";
+
 function SignOutControl({ label }: { label: string }) {
   return (
     <SignOutButton redirectUrl="/">
-      <button
-        type="button"
-        className="min-h-12 border border-white/15 bg-white/[0.035] px-6 py-3 text-sm font-bold text-zinc-200 transition hover:border-white/30 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
-      >
+      <button type="button" className={signOutButtonClass}>
         {label}
       </button>
     </SignOutButton>

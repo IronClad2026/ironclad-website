@@ -8,6 +8,7 @@ import "./globals.css";
 import Footer from "@/components/Footer";
 import GlobalSmoke from "@/components/GlobalSmoke";
 import Navbar from "@/components/Navbar";
+import ReadyHeader from "@/components/ready/ReadyHeader";
 import NotificationBadgeRuntime from "@/components/NotificationBadgeRuntime";
 import ConsentAwareVercelAnalytics from "@/components/analytics/ConsentAwareVercelAnalytics";
 import LocaleProvider from "@/components/i18n/LocaleProvider";
@@ -15,11 +16,18 @@ import AccountLegalUpdateGate from "@/components/legal/AccountLegalUpdateGate";
 import SiteMusicPlayer from "@/components/SiteMusicPlayer";
 import SmoothScrollProvider from "@/components/SmoothScrollProvider";
 import { loadAccountLegalRuntimeState } from "@/lib/account-legal-acceptance";
+import { isCasterProgramEnabled } from "@/lib/caster/environment";
+import { getCasterProfileCopy } from "@/lib/caster/profile-copy";
+import { getPublicCasterCopy } from "@/lib/caster/public-copy";
+import { CASTER_CHROME_HEADER, CASTER_PUBLIC_HOME_CHROME } from "@/lib/caster/routes";
+import { canOpenCasterStudioFromNavigation } from "@/lib/caster/server";
 import { loadClerkLocalization } from "@/lib/i18n/clerk";
 import { loadDictionary } from "@/lib/i18n/loaders";
 import { getRequestLocale } from "@/lib/i18n/request";
 import { getLegalDocument } from "@/lib/legal-corpus-publication";
 import { isPublicProfileNoticeInstalled, NOTICE_LAYOUT_HEADER } from "@/lib/public-gaming-profile-notice";
+import { isReadyEnabled, isReadyEngagementEnabled } from "@/lib/ready/review-access";
+import { isReadyWardrobePilotEnabled } from "@/lib/wardrobe/environment";
 
 const icons: Metadata["icons"] = {
   icon: [
@@ -81,13 +89,18 @@ export default async function RootLayout({
   children: ReactNode;
 }>) {
   const locale = await getRequestLocale();
-  // Proxy discards incoming copies of this header before assigning either
-  // layout. No private navbar/badge queries run in the access-only layout.
-  if (isPublicProfileNoticeInstalled() && (await headers()).get(NOTICE_LAYOUT_HEADER)) {
+  const requestHeaders = await headers();
+  const casterEnabled = isCasterProgramEnabled();
+  const casterDocument = casterEnabled && requestHeaders.get(CASTER_CHROME_HEADER) === "bare";
+  const casterPublicHome = casterEnabled && requestHeaders.get(CASTER_CHROME_HEADER) === CASTER_PUBLIC_HOME_CHROME;
+  const noticeDocument = isPublicProfileNoticeInstalled() && requestHeaders.get(NOTICE_LAYOUT_HEADER);
+  // These access documents own their content and checks. The proxy's chrome
+  // marker only keeps the standard shell and its private queries out of them.
+  if (casterDocument || noticeDocument || casterPublicHome) {
     return (
       <ClerkProvider localization={await loadClerkLocalization(locale)}>
         <html lang={locale}>
-          <body>{children}</body>
+          <body data-caster-public-home-document={casterPublicHome || undefined}>{children}</body>
         </html>
       </ClerkProvider>
     );
@@ -104,6 +117,11 @@ export default async function RootLayout({
   const ppa = getLegalDocument("ppa");
   const analyticsConsentAvailable =
     isVercelProduction && legalRuntime.analyticsAvailable;
+  const casterNavigation = casterEnabled ? {
+    directoryLabel: getPublicCasterCopy(locale).directory,
+    studioLabel: legalRuntime.accountGate.status === "satisfied" && await canOpenCasterStudioFromNavigation()
+      ? getCasterProfileCopy(locale).title : undefined,
+  } : undefined;
 
   return (
     <ClerkProvider localization={clerkLocalization}>
@@ -117,7 +135,10 @@ export default async function RootLayout({
             >
               <SmoothScrollProvider>
                 <GlobalSmoke />
-                <Navbar />
+                <Navbar
+                  ready={isReadyEnabled() ? <ReadyHeader wardrobePilotEnabled={isReadyWardrobePilotEnabled()} engagementEnabled={isReadyEngagementEnabled()} /> : undefined}
+                  casters={casterNavigation}
+                />
 
                 <div>{children}</div>
 
