@@ -560,6 +560,7 @@ export default function InAppNotificationCenter({
           >
             {inboxAction}
             <ChevronRight aria-hidden size={15} />
+            <span className="sr-only" aria-hidden="true">{inboxSummary}</span>
           </button>
         </div>
       ) : <button
