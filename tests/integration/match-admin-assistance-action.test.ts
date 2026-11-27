@@ -1,9 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ auth: vi.fn(), admin: vi.fn(), rpc: vi.fn(), authenticated: vi.fn(), history: vi.fn(), legal: vi.fn(), profile: vi.fn() }));
+const mocks = vi.hoisted(() => ({ auth: vi.fn(), admin: vi.fn(), rpc: vi.fn(), history: vi.fn(), legal: vi.fn(), profile: vi.fn() }));
 vi.mock("@clerk/nextjs/server", () => ({ auth: mocks.auth }));
+vi.mock("@/lib/patch2-admin-access", async () => {
+  const { createPatch2AdminAccessFixture } = await import("@/tests/fixtures/patch2-admin-access");
+  return createPatch2AdminAccessFixture(mocks.auth);
+});
 vi.mock("@/lib/supabase-admin", () => ({ createSupabaseAdminClient: mocks.admin }));
-vi.mock("@/lib/supabase-server", () => ({ createAuthenticatedSupabaseClient: mocks.authenticated }));
 vi.mock("@/app/tournaments/room-actions", () => ({ getMatchRoomHistory: mocks.history }));
 vi.mock("@/lib/account-legal-mutation-guard", () => ({ requireCurrentAccountLegalAcceptance: mocks.legal }));
 vi.mock("@/lib/public-players", () => ({ getPublicPlayerById: mocks.profile }));
@@ -24,75 +27,47 @@ function client() {
 
 beforeEach(() => {
   vi.resetAllMocks();
-  mocks.auth.mockResolvedValue({ userId: "user_original", sessionClaims: {} });
+  mocks.auth.mockResolvedValue({ userId: "user_original", sessionId: "synthetic-session", sessionClaims: {} });
   mocks.legal.mockResolvedValue(undefined);
   mocks.history.mockResolvedValue({ ok: true, data: { room } });
-  mocks.authenticated.mockResolvedValue({ rpc: mocks.rpc });
   mocks.rpc.mockResolvedValue({ data: requested, error: null });
-  mocks.admin.mockReturnValue(client());
+  mocks.admin.mockReturnValue({ ...client(), rpc: mocks.rpc });
 });
 
-describe("room assistance commands", () => {
-  it("reports shutdown denial without returning private database errors", async () => {
-    mocks.rpc.mockResolvedValue({ data: null, error: { code: "P0001", message: "MATCH_ROOM_DISABLED" } });
-    expect(await requestMatchAdminAssistance(input)).toEqual({ ok: false, code: "disabled" });
-    expect(await requestMatchAdminAssistance({ ...input, expectedRequestVersion: 1 })).toEqual({ ok: false, code: "disabled" });
-  });
-  it("requires authentication before any private RPC", async () => {
-    mocks.auth.mockResolvedValue({ userId: null });
-    expect(await requestMatchAdminAssistance(input)).toEqual({ ok: false, code: "auth_required" });
-    expect(await getMatchRoomAssistance({ roomId: ROOM })).toEqual({ ok: false, code: "auth_required" });
-    expect(mocks.authenticated).not.toHaveBeenCalled();
-    expect(mocks.admin).not.toHaveBeenCalled();
-  });
-  it("uses the authenticated immutable-room command and no browser actor or service-role writes", async () => {
-    expect(await requestMatchAdminAssistance(input)).toEqual({ ok: true, data: requested });
-    expect(mocks.rpc).toHaveBeenCalledWith("request_match_room_assistance", { p_room_id: ROOM, p_expected_request_version: 0 });
-    expect(mocks.admin).not.toHaveBeenCalled();
-    expect(mocks.history).not.toHaveBeenCalled();
-  });
-  it("reads without a mutation legal guard", async () => {
-    expect((await getMatchRoomAssistance({ roomId: ROOM })).ok).toBe(true);
-    expect(mocks.rpc).toHaveBeenCalledWith("get_match_room_assistance", { p_room_id: ROOM });
+describe("retained shared room assistance compatibility", () => {
+  it("rejects old textless creation without touching the database", async () => {
+    expect(await requestMatchAdminAssistance(input)).toEqual({ ok: false, code: "invalid_request" });
+    expect(mocks.rpc).not.toHaveBeenCalled();
     expect(mocks.legal).not.toHaveBeenCalled();
   });
-  it.each([null, { ...input, actorId: "spoof" }, { ...input, expectedRequestVersion: -1 }, { ...input, roomId: "invalid" }])("rejects invalid or identity-bearing input", async (value) => {
-    expect(await requestMatchAdminAssistance(value as typeof input)).toEqual({ ok: false, code: "invalid_request" });
-    expect(mocks.rpc).not.toHaveBeenCalled();
+  it("still authenticates old requests before returning guidance", async () => {
+    mocks.auth.mockResolvedValue({ userId: null });
+    expect(await requestMatchAdminAssistance(input)).toEqual({ ok: false, code: "auth_required" });
+    expect(mocks.admin).not.toHaveBeenCalled();
   });
-  it("requires exact admin metadata for resolution", async () => {
+  it("reads original shared history without a mutation legal guard", async () => {
+    expect((await getMatchRoomAssistance({ roomId: ROOM })).ok).toBe(true);
+    expect(mocks.rpc).toHaveBeenCalledWith("call_patch2_private_assistance", {
+      p_operation: "get_match_room_assistance", p_arguments: { p_room_id: ROOM },
+      p_actor_clerk_user_id: "user_original", p_actor_is_admin: false,
+    });
+    expect(mocks.legal).not.toHaveBeenCalled();
+  });
+  it("preserves admin-only resolution of the original shared record", async () => {
     expect(await resolveMatchAdminAssistance({ ...input, expectedRequestVersion: 1 })).toEqual({ ok: false, code: "forbidden" });
-    expect(mocks.rpc).not.toHaveBeenCalled();
-    mocks.auth.mockResolvedValue({ userId: "admin_actor", sessionClaims: { metadata: { role: "admin" } } });
+    mocks.auth.mockResolvedValue({ userId: "admin_actor", sessionId: "synthetic-admin-session", sessionClaims: { metadata: { role: "admin" } } });
     mocks.rpc.mockResolvedValue({ data: { ...requested, status: "resolved", resolvedAt: "2026-09-20T01:01:00.000Z" }, error: null });
     expect((await resolveMatchAdminAssistance({ ...input, expectedRequestVersion: 1 })).ok).toBe(true);
-    expect(mocks.rpc).toHaveBeenCalledWith("resolve_match_room_assistance", { p_room_id: ROOM, p_expected_request_version: 1 });
+    expect(mocks.rpc).toHaveBeenCalledWith("call_patch2_private_assistance", {
+      p_operation: "resolve_match_room_assistance",
+      p_arguments: { p_room_id: ROOM, p_expected_request_version: 1 },
+      p_actor_clerk_user_id: "admin_actor", p_actor_is_admin: true,
+    });
     expect(mocks.legal).toHaveBeenCalledOnce();
   });
-  it("retains the same expected version on retry and requires the returned version for reopen", async () => {
-    await requestMatchAdminAssistance(input);
-    await requestMatchAdminAssistance(input);
-    expect(mocks.rpc.mock.calls[0]).toEqual(mocks.rpc.mock.calls[1]);
-    await requestMatchAdminAssistance({ ...input, expectedRequestVersion: 1 });
-    expect(mocks.rpc.mock.calls[2][1].p_expected_request_version).toBe(1);
-  });
-  it.each([["42501", "forbidden"], ["40001", "stale_room"], ["22023", "invalid_request"], ["other", "unavailable"]])("maps %s without disclosing error content", async (code, expected) => {
+  it.each([["42501", "forbidden"], ["40001", "stale_room"], ["22023", "invalid_request"], ["other", "unavailable"]])("maps retained read errors %s safely", async (code, expected) => {
     mocks.rpc.mockResolvedValue({ data: null, error: { code, message: "private error details" } });
-    expect(await requestMatchAdminAssistance(input)).toEqual({ ok: false, code: expected });
-  });
-  it("rejects responses with another room or private extra fields", async () => {
-    mocks.rpc.mockResolvedValue({ data: { ...requested, roomId: OPPONENT }, error: null });
-    expect((await requestMatchAdminAssistance(input)).ok).toBe(false);
-    mocks.rpc.mockResolvedValue({ data: { ...requested, resolvedBy: "private_actor" }, error: null });
-    expect((await requestMatchAdminAssistance(input)).ok).toBe(false);
-  });
-  it("fails closed when acceptance or the RPC transport fails", async () => {
-    mocks.legal.mockRejectedValue(new Error("unavailable"));
-    expect((await requestMatchAdminAssistance(input)).ok).toBe(false);
-    expect(mocks.rpc).not.toHaveBeenCalled();
-    mocks.legal.mockResolvedValue(undefined);
-    mocks.authenticated.mockRejectedValue(new Error("offline"));
-    expect(await requestMatchAdminAssistance(input)).toEqual({ ok: false, code: "unavailable" });
+    expect(await getMatchRoomAssistance({ roomId: ROOM })).toEqual({ ok: false, code: expected });
   });
 });
 

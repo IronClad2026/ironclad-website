@@ -43,6 +43,7 @@ const player = {
   region: "Oceania",
   currentElo: 1550,
   publicProfileEnabled: true,
+  optionalProfileEnabled: true,
   discordPublicEnabled: false,
   discordUsername: null,
   hasAvatar: false,
@@ -78,7 +79,7 @@ describe("public profile active tournament ELO snapshots", () => {
 
     expect(getPublicPlayerByIdMock).toHaveBeenCalledWith(PLAYER_ID);
     expect(getPublicActiveTournamentEloSnapshotsMock).toHaveBeenCalledWith(
-      PLAYER_ID
+      PLAYER_ID, true
     );
     expect(stats?.props).toEqual({
       player,
@@ -102,6 +103,16 @@ describe("public profile active tournament ELO snapshots", () => {
     expect(JSON.stringify(stats?.props.activeTournamentEloSnapshots)).not.toContain(
       "76561198012345678"
     );
+    expect(notFoundMock).not.toHaveBeenCalled();
+  });
+
+  it("requests only the approved snapshots for a public core profile", async () => {
+    getPublicPlayerByIdMock.mockResolvedValue({ ...player, optionalProfileEnabled: false });
+    getPublicActiveTournamentEloSnapshotsMock.mockResolvedValue([]);
+
+    await PublicPlayerProfilePage({ params: Promise.resolve({ playerId: PLAYER_ID }), searchParams: Promise.resolve({}) });
+
+    expect(getPublicActiveTournamentEloSnapshotsMock).toHaveBeenCalledWith(PLAYER_ID, false);
     expect(notFoundMock).not.toHaveBeenCalled();
   });
 });

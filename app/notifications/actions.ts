@@ -11,6 +11,7 @@ import {
   markNotificationsRead,
   type NotificationScope,
 } from "@/lib/notifications";
+import { hasCurrentPatch2AdminAccess } from "@/lib/patch2-admin-access";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { loadWebPushConfig } from "@/lib/web-push/config";
 import {
@@ -27,7 +28,7 @@ type CustomClaims = {
 
 export type NotificationMutationResult =
   | { ok: true; unreadCount: number }
-  | { ok: false; code: "unavailable" };
+  | { ok: false; code: "unavailable"; message?: string };
 
 type NotificationPushFailureCode =
   | "authentication_required"
@@ -65,6 +66,12 @@ export type WebPushSubscriptionOwnershipResult =
 const unavailableResult = (): NotificationMutationResult => ({
   ok: false,
   code: "unavailable",
+});
+
+const adminScopeRequiredResult = (): NotificationMutationResult => ({
+  ok: false,
+  code: "unavailable",
+  message: "Open the selected tournament's Notifications workspace or the scoped Admin inbox before changing notifications.",
 });
 
 export async function getNotificationPushConfiguration(): Promise<NotificationPushConfigurationResult> {
@@ -201,6 +208,9 @@ export async function loadAuthoritativeNotificationUnreadCount(): Promise<Notifi
   const scope: NotificationScope = isAdmin(identity.sessionClaims)
     ? "admin"
     : "player";
+  if (scope === "admin" && !await hasCurrentPatch2AdminAccess(identity.userId, identity.sessionClaims, identity.sessionId)) {
+    return { ok: false, code: "authentication_required" };
+  }
   let unreadCount: number | null;
 
   try {
@@ -213,6 +223,9 @@ export async function loadAuthoritativeNotificationUnreadCount(): Promise<Notifi
     unreadCount = null;
   }
 
+  if (scope === "admin" && !await hasCurrentPatch2AdminAccess(identity.userId, identity.sessionClaims, identity.sessionId)) {
+    return { ok: false, code: "authentication_required" };
+  }
   return unreadCount === null
     ? { ok: false, code: "unavailable" }
     : { ok: true, unreadCount };
@@ -231,6 +244,8 @@ export async function markInAppNotificationRead(
   if (scope === "admin" && !isAdmin(sessionClaims as CustomClaims | null)) {
     return unavailableResult();
   }
+
+  if (scope === "admin") return adminScopeRequiredResult();
 
   await requireCurrentAccountLegalAcceptance();
 
@@ -263,6 +278,8 @@ export async function markVisibleInAppNotificationsRead(
     return unavailableResult();
   }
 
+  if (scope === "admin") return adminScopeRequiredResult();
+
   await requireCurrentAccountLegalAcceptance();
 
   const notificationIds = formData
@@ -293,6 +310,8 @@ export async function markAllInAppNotificationsRead(
     return unavailableResult();
   }
 
+  if (scope === "admin") return adminScopeRequiredResult();
+
   await requireCurrentAccountLegalAcceptance();
 
   const updated = await markAllNotificationsRead({
@@ -317,9 +336,7 @@ export async function deleteSelectedInAppNotifications(
     return unavailableResult();
   }
 
-  if (scope === "admin") {
-    await requireCurrentAccountLegalAcceptance();
-  }
+  if (scope === "admin") return adminScopeRequiredResult();
 
   const notificationIds = formData
     .getAll("notificationId")
@@ -370,13 +387,15 @@ function isAdmin(claims: CustomClaims | null) {
 async function loadNotificationIdentity(): Promise<{
   userId: string;
   sessionClaims: CustomClaims | null;
+  sessionId: string | null;
 } | null> {
   try {
-    const { userId, sessionClaims } = await auth();
+    const { userId, sessionClaims, sessionId } = await auth();
     return userId
       ? {
           userId,
           sessionClaims: sessionClaims as CustomClaims | null,
+          sessionId,
         }
       : null;
   } catch {

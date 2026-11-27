@@ -31,6 +31,8 @@ function migrationTreeSha256(names: string[]) {
 const source = {
   actions: read("app/admin/tournaments/actions.ts"),
   admin: read("app/admin/page.tsx"),
+  adminPageAccess: read("lib/admin-page-access.ts"),
+  patch2AdminAccess: read("lib/patch2-admin-access.ts"),
   announcements: read("app/announcements/page.tsx"),
   announcementsAdmin: read("app/admin/announcements/page.tsx"),
   banner: read("components/TournamentBannerPicker.tsx"),
@@ -347,7 +349,7 @@ const capabilities: Capability[] = [
       {
         file: "registrations",
         includes: [
-          '["all", "pending", "manual_review", "approved", "rejected", "withdrawn"]',
+          '["all", "pending", "manual_review", "approved", "rejected", "waitlisted", "withdrawn"]',
           "aria-current={data.activeFilter === filter ? \"page\" : undefined}",
         ],
       },
@@ -410,7 +412,7 @@ const capabilities: Capability[] = [
       },
       {
         file: "registrationActions",
-        includes: ['rpc("review_tournament_registration"'],
+        includes: ['rpc("review_tournament_registration_scoped_as_admin"'],
       },
     ],
   },
@@ -654,7 +656,7 @@ const capabilities: Capability[] = [
     label: "dice snapshot",
     section: "matches",
     evidence: [
-      { file: "experience", includes: ["AuthenticatedMatchDiceRollOff", "get_match_dice_rolloff"] },
+      { file: "experience", includes: ["AuthenticatedMatchDiceRollOff", "getMatchDiceHistory"] },
       { file: "matches", includes: ["<AdminMatchManagementModal"] },
     ],
   },
@@ -758,7 +760,7 @@ const capabilities: Capability[] = [
       {
         file: "admin",
         includes: [
-          "InAppNotificationCenter",
+          "/admin/notifications",
           'href: "/admin/maps"',
           'href: "/admin/polls"',
           'href: "/admin/announcements"',
@@ -850,12 +852,19 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
   });
 
   it("authorizes every route and server loader before privileged access", () => {
-    for (const key of ["list", "newRoute", "workspace"] as const) {
+    for (const key of ["list", "workspace"] as const) {
       const page = compact(source[key]);
-      expect(page, key).toContain("const { userId, sessionClaims } = await auth()");
-      expect(page, key).toContain('role !== "admin"');
-      expect(page, key).toContain('redirect("/")');
+      expect(page, key).toContain("await hasAdminPageAccess(");
+      expect(page, key).toContain("return <AdminAccessRequired />");
     }
+    expect(source.adminPageAccess).toContain("await auth()");
+    expect(source.adminPageAccess).toContain("hasCurrentPatch2AdminAccess(");
+    expect(source.patch2AdminAccess).toContain("import \"server-only\"");
+    expect(source.patch2AdminAccess).toContain("export async function requireCurrentPatch2Admin(");
+    // The separate creation page keeps its existing independent authorization.
+    expect(compact(source.newRoute)).toContain("const { userId, sessionClaims } = await auth()");
+    expect(compact(source.newRoute)).toContain('role !== "admin"');
+    expect(compact(source.newRoute)).toContain('redirect("/")');
 
     for (const key of [
       "workspaceData",
@@ -863,7 +872,9 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
       "matchWorkspace",
     ] as const) {
       expect(compact(source[key]), key).toContain('import "server-only"');
-      expect(compact(source[key]), key).toContain("await auth()");
+      expect(compact(source[key]), key).toContain(
+        key === "matchWorkspace" ? "await auth()" : "await requireCurrentPatch2Admin()"
+      );
     }
 
     expect(source.workspace).toContain("if (!isUuid(tournamentId))");
@@ -904,7 +915,8 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
     const workspace = compact(source.workspace);
     const actions = compact(source.actions);
 
-    expect(workspace).toContain("const content = await renderWorkspaceSection({");
+    expect(workspace).toContain("await renderWorkspaceSection({");
+    expect(workspace).toContain('section === "assistance" || section === "notifications"');
     expect(source.workspace.split("{content}")).toHaveLength(2);
     for (const section of [
       "overview",
@@ -958,7 +970,8 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
     expect(source.actions.match(/rpc\("launch_tournament_division"/g)).toHaveLength(1);
     expect(source.actions.match(/rpc\("delete_tournament_data"/g)).toHaveLength(1);
     expect(source.mapPoolActions.match(/rpc\(/g)).toHaveLength(2);
-    expect(source.registrationActions.match(/rpc\("review_tournament_registration"/g)).toHaveLength(2);
+    expect(source.registrationActions.match(/rpc\("review_tournament_registration_scoped_as_admin"/g)).toHaveLength(1);
+    expect(source.registrationActions.match(/rpc\("approve_tournament_registrations_scoped_as_admin"/g)).toHaveLength(1);
     expect(source.mediaActions).not.toContain(".rpc(");
     for (const action of [
       "createTournamentMedia",
@@ -1014,7 +1027,7 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
     expect(source.experience).toContain('activeTab === "announcements"');
   });
 
-  it("preserves the Production migration boundary and dependency versions with additive release tooling", () => {
+  it("preserves the Production migration boundary and pins reviewed dependency versions", () => {
     const migrationNames = readdirSync(
       resolve(process.cwd(), "supabase/migrations")
     )
@@ -1023,6 +1036,31 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
     const baselineMigrationNames = migrationNames.filter(
       (name) => name <= "20260923062127_match_room_retention_and_privacy.sql"
     );
+    expect(migrationNames.filter((name) => !baselineMigrationNames.includes(name)))
+      .toEqual([
+        "20261001032942_production_showcase_authority.sql",
+        "20261001032957_production_combat_highlights_authority.sql",
+        "20261001032959_production_private_match_room_realtime.sql",
+        "20261001033000_production_versioned_competition_authority.sql",
+        "20261001033001_production_versioned_accounting_badges.sql",
+        "20261001040810_production_retire_legacy_creation.sql",
+        "20261013184857_production_legacy_main_pro_event_one.sql",
+        "20261024173736_announcement_rich_documents.sql",
+        "20261026181023_persisted_verified_relic_identity.sql",
+        "20261027181708_public_competitive_profile_read_projections.sql",
+        "20261101220837_patch2_scoped_registration_review.sql",
+        "20261101230355_patch2_admin_inbox_legacy_assistance.sql",
+        "20261102192200_patch2_private_assistance_conversations.sql",
+        "20261102195256_patch2_private_assistance_active_actor.sql",
+        "20261113000000_patch2_private_assistance_server_boundary.sql",
+        "20261113010000_patch2_durable_account_closure.sql",
+        "20261113045827_patch2_verified_staff_access.sql",
+        "20261113050025_patch2_public_gaming_profile_acknowledgement.sql",
+        "20261113071907_patch2_retire_legacy_registration_writes.sql",
+        "20261113072932_patch2_verify_private_assistance_privacy_operators.sql",
+        "20261113110000_patch2_gaming_profile_publication.sql",
+        "20261114064733_patch2_match_staff_authorization.sql",
+      ]);
 
     const badgeIntegrationMigrationNames = new Set([
       "20260821000000_badge_award_foundation.sql",
@@ -1117,7 +1155,8 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
     );
     const lock = JSON.parse(read("package-lock.json"));
     for (const [name, version] of Object.entries({
-      next: "16.3.3", react: "19.2.4", "react-dom": "19.2.4",
+      next: "16.4.5", "eslint-config-next": "16.4.5", sharp: "0.35.5",
+      react: "19.2.4", "react-dom": "19.2.4",
       "@clerk/nextjs": "7.3.7", "@supabase/supabase-js": "2.106.1",
     })) {
       expect(lock.packages[`node_modules/${name}`].version).toBe(version);

@@ -1,7 +1,6 @@
 import { requireDivisionModelVersion, resolveDivisionId, type DivisionModelVersion } from "@/lib/division-model";
 import "server-only";
 
-import { auth } from "@clerk/nextjs/server";
 import type { AdminBracketTournamentOption } from "@/components/AdminBracketManagement";
 import {
   mapCoh3MapDatabaseRow,
@@ -9,6 +8,8 @@ import {
   type Coh3MapRow,
 } from "@/lib/coh3-maps";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
+import { loadAdminTournamentRegistrationSummary } from "@/lib/admin-tournament-registration-workspace";
+import { requireCurrentPatch2Admin } from "@/lib/patch2-admin-access";
 import type { TournamentDivisionStateResolution } from "@/lib/tournament-division-state";
 import { loadTournamentDivisionStates } from "@/lib/tournament-division-state-data";
 import {
@@ -19,12 +20,6 @@ import {
   type TournamentRow,
 } from "@/lib/tournaments";
 import type { TournamentDeletionPreview } from "@/components/DeleteTournamentControl";
-
-type CustomClaims = {
-  metadata?: {
-    role?: string;
-  };
-};
 
 export type AdminTournamentWorkspaceBracket = TournamentBracketRow & {
   map_pool_published_at: string | null;
@@ -124,22 +119,10 @@ export async function loadAdminTournamentWorkspace(tournamentId: string) {
   tournament.tournament_brackets = sortBrackets(
     tournament.tournament_brackets ?? [], requireDivisionModelVersion(tournament.division_model_version)
   );
-  const [registrationResult, divisionStatesByTournament] = await Promise.all([
-    supabase
-      .from("registrations")
-      .select("registration_status, tournament_bracket_id")
-      .eq("tournament_id", tournamentId),
+  const [registrations, divisionStatesByTournament] = await Promise.all([
+    loadAdminTournamentRegistrationSummary(tournament.id),
     loadTournamentDivisionStates(supabase, [tournament]),
   ]);
-
-  if (registrationResult.error) {
-    console.error("Admin Tournament workspace summary load failed.", {
-      operation: "load-tournament-workspace-summary",
-    });
-    throw new Error("Tournament management data could not be loaded.");
-  }
-
-  const registrations = registrationResult.data ?? [];
   const divisionStates = divisionStatesByTournament.get(tournament.id);
 
   if (!divisionStates) {
@@ -744,12 +727,7 @@ function sortBrackets<T extends TournamentBracketRow>(brackets: T[], model: Divi
 }
 
 async function requireAdmin() {
-  const { userId, sessionClaims } = await auth();
-  const role = (sessionClaims as CustomClaims | null)?.metadata?.role;
-
-  if (!userId || role !== "admin") {
-    throw new Error("Unauthorized");
-  }
+  await requireCurrentPatch2Admin();
 }
 
 export function isAdminTournamentWorkspaceTerminal(

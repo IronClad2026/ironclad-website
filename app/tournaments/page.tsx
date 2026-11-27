@@ -381,8 +381,8 @@ export default async function TournamentsPage({
   const playerResult =
     playerIds.length > 0
       ? await supabase
-          .from("players")
-          .select("id, clerk_user_id, account_closed_at")
+          .from("gaming_profile_disclosure")
+          .select("id, clerk_user_id, account_closed_at, profile_public, optional_public")
           .in("clerk_user_id", playerIds)
       : { data: [], error: null };
 
@@ -402,6 +402,8 @@ export default async function TournamentsPage({
         id: string;
         clerk_user_id: string;
         account_closed_at: string | null;
+        profile_public: boolean;
+        optional_public: boolean;
       }[]
     ).map((player) => [player.clerk_user_id, player])
   );
@@ -484,7 +486,8 @@ export default async function TournamentsPage({
             playerId: player.id,
             accountClosedAt: player.account_closed_at,
           }
-        : null
+        : null,
+      { profilePublic: player?.profile_public === true, optionalPublic: player?.optional_public === true }
     );
     const bracketParticipants =
       bracketParticipantsByTournament.get(registration.tournament_id) ?? [];

@@ -80,12 +80,14 @@ function fixture() {
       registration(102, 1, 11, 202, "Historical Opponent", 1600),
       registration(103, 2, 21, 201, "Current Campaign Alias", 824),
     ],
-    players: [
+    gaming_profile_disclosure: [
       {
         id: uuid(201),
         coh3_profile_id: "7654321",
         public_profile_enabled: true,
         account_closed_at: null,
+        profile_public: true,
+        optional_public: true,
         in_game_name: "Current Alias",
         display_name: "Current Alias",
         current_elo: 999,
@@ -108,6 +110,8 @@ function fixture() {
         coh3_profile_id: "7777777",
         public_profile_enabled: false,
         account_closed_at: null,
+        profile_public: true,
+        optional_public: true,
         in_game_name: "Private Alias",
         display_name: "Private Alias",
       },
@@ -336,7 +340,7 @@ describe("competition read products together", () => {
 
   it("retains the public profile URL without manufacturing an unbound Relic identity", async () => {
     const db = fixture();
-    db.tables.players[1].coh3_profile_id = null;
+    db.tables.gaming_profile_disclosure[1].coh3_profile_id = null;
     const event = await loadTournamentCompetitionView(
       db.client, "legacy-event", { now },
     );
@@ -355,7 +359,7 @@ describe("competition read products together", () => {
 
   it("does not correlate a defensively bound closed competitor", async () => {
     const db = fixture();
-    db.tables.players[1].account_closed_at = "2026-10-20T00:00:00Z";
+    db.tables.gaming_profile_disclosure[1].account_closed_at = "2026-10-20T00:00:00Z";
     await expect(
       loadPlayerCompetitionHistory(db.client, "7777777", { now }),
     ).resolves.toEqual({ outcome: "HIDDEN" });
@@ -377,11 +381,33 @@ describe("competition read products together", () => {
 
   it("does not recover an unbound or closed identity from historical aliases", async () => {
     const db = fixture();
-    db.tables.players[0].coh3_profile_id = null;
-    db.tables.players[0].account_closed_at = "2026-10-20T00:00:00Z";
+    db.tables.gaming_profile_disclosure[0].coh3_profile_id = null;
+    db.tables.gaming_profile_disclosure[0].account_closed_at = "2026-10-20T00:00:00Z";
     await expect(
       loadPlayerCompetitionHistory(db.client, "7654321", { now }),
     ).resolves.toEqual({ outcome: "NOT_FOUND" });
     expect(db.requests).toHaveLength(1);
+  });
+
+  it("keeps official history, core links and event ELO while hiding optional Relic correlation", async () => {
+    const db = fixture();
+    const restricted = db.tables.gaming_profile_disclosure[1];
+    restricted.optional_public = false;
+    restricted.coh3_profile_id = null;
+    restricted.display_name = null;
+
+    await expect(loadPlayerCompetitionHistory(db.client, "7777777", { now }))
+      .resolves.toEqual({ outcome: "NOT_FOUND" });
+    const event = await loadTournamentCompetitionView(db.client, "legacy-event", { now });
+    const main = event!.divisions.find((division) => division.canonicalName === "Main")!;
+    expect(main.participants.find((row) => row.registrationId === uuid(102))).toEqual({
+      registrationId: uuid(102),
+      eventAlias: "Historical Opponent",
+      eventElo: 1600,
+      registrationStatus: "approved",
+      profileUrl: `https://www.ironcladtournaments.com/players/${uuid(202)}`,
+      relicProfileId: null,
+    });
+    expect(main.bracket?.matches.some((match) => match.playerTwoRegistrationId === uuid(102))).toBe(true);
   });
 });

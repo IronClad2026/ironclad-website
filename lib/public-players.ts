@@ -12,11 +12,12 @@ export type PublicPlayerProfile = {
   // Compatibility for existing contact readers: every returned active profile is public.
   // This value is derived from the active-only view, never the legacy player flag.
   publicProfileEnabled: true;
+  optionalProfileEnabled: boolean;
   discordPublicEnabled: boolean;
   discordUsername: string | null;
   hasAvatar: boolean;
   avatarUrl: string | null;
-  createdAt: string;
+  createdAt: string | null;
 };
 
 type PublicPlayerProfileRow = {
@@ -26,11 +27,12 @@ type PublicPlayerProfileRow = {
   country: string | null;
   region: string | null;
   current_elo: number | null;
+  optional_profile_enabled: boolean;
   discord_public_enabled: boolean;
   discord_username: string | null;
   has_avatar: boolean;
   avatar_url: string | null;
-  created_at: string;
+  created_at: string | null;
 };
 
 const PUBLIC_PLAYER_PROFILE_COLUMNS = [
@@ -40,6 +42,7 @@ const PUBLIC_PLAYER_PROFILE_COLUMNS = [
   "country",
   "region",
   "current_elo",
+  "optional_profile_enabled",
   "discord_public_enabled",
   "discord_username",
   "has_avatar",
@@ -56,7 +59,8 @@ export async function getPublicPlayers(): Promise<PublicPlayerProfile[]> {
     .from("public_player_profiles")
     .select(PUBLIC_PLAYER_PROFILE_COLUMNS)
     .order("current_elo", { ascending: false, nullsFirst: false })
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false, nullsFirst: false })
+    .order("id", { ascending: true });
 
   if (error || !Array.isArray(data)) {
     console.error("Public players load failed.");
@@ -98,19 +102,21 @@ function mapPublicPlayerProfile(
   const discordUsername = row.discord_username?.trim() || null;
   const discordPublicEnabled =
     row.discord_public_enabled && discordUsername !== null;
+  const optionalProfileEnabled = row.optional_profile_enabled === true;
 
   return {
     id: row.id,
-    displayName: row.display_name,
+    displayName: optionalProfileEnabled ? row.display_name : row.player_name,
     playerName: row.player_name,
-    country: row.country,
+    country: optionalProfileEnabled ? row.country : null,
     region: row.region,
     currentElo: row.current_elo,
     publicProfileEnabled: true,
+    optionalProfileEnabled,
     discordPublicEnabled,
     discordUsername: discordPublicEnabled ? discordUsername : null,
-    hasAvatar: row.has_avatar,
-    avatarUrl: row.has_avatar ? `/players/${row.id}/avatar` : null,
-    createdAt: row.created_at,
+    hasAvatar: optionalProfileEnabled && row.has_avatar,
+    avatarUrl: optionalProfileEnabled && row.has_avatar ? `/players/${row.id}/avatar` : null,
+    createdAt: optionalProfileEnabled ? row.created_at : null,
   };
 }

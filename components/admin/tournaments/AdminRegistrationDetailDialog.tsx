@@ -15,6 +15,7 @@ export default function AdminRegistrationDetailDialog({
   activeFilter,
   focus,
   notice,
+  page = 1,
   registration,
   section,
   terminal,
@@ -24,6 +25,7 @@ export default function AdminRegistrationDetailDialog({
   activeFilter: AdminTournamentRegistrationFilter;
   focus?: "note" | "reject" | "manual_review";
   notice?: string;
+  page?: number;
   registration: AdminRegistrationReviewRow;
   section: AdminTournamentRegistrationSection;
   terminal: boolean;
@@ -32,6 +34,7 @@ export default function AdminRegistrationDetailDialog({
 }) {
   const closeHref = buildWorkspaceHref({
     activeFilter,
+    page,
     section,
     tournamentId,
   });
@@ -108,6 +111,7 @@ export default function AdminRegistrationDetailDialog({
             value={tournamentId}
           />
           <input type="hidden" name="workspaceSection" value={section} />
+          <input type="hidden" name="workspacePage" value={page} />
 
           <div className="rounded-2xl border border-orange-500/20 bg-orange-500/10 p-4">
             <label
@@ -234,7 +238,11 @@ function RegistrationDecisionNotice({
 }) {
   const success = notice === "saved";
   const message =
-    notice === "note-required"
+    notice === "registration-scope-required"
+      ? "Open this registration from its Tournament workspace before taking this action."
+      : notice === "registration-scope-mismatch"
+        ? "No changes were made. This registration does not belong to the selected Tournament."
+      : notice === "note-required"
       ? "Add an Admin note before rejecting or marking this registration for manual review."
       : notice === "saved"
         ? "Registration decision and Admin note saved."
@@ -326,14 +334,16 @@ function getEvidenceFacts(registration: AdminRegistrationReviewRow) {
 
 function buildWorkspaceHref({
   activeFilter,
+  page,
   section,
   tournamentId,
 }: {
   activeFilter: AdminTournamentRegistrationFilter;
+  page: number;
   section: AdminTournamentRegistrationSection;
   tournamentId: string;
 }) {
-  const params = new URLSearchParams({ section, filter: activeFilter });
+  const params = new URLSearchParams({ section, filter: activeFilter, page: String(page) });
   return `/admin/tournaments/${encodeURIComponent(tournamentId)}?${params.toString()}`;
 }
 

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { act, cleanup, renderHook } from "@testing-library/react";
+import { createHash } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import useMatchRoomRealtime from "@/components/useMatchRoomRealtime";
 import type { MatchRoom } from "@/lib/match-room";
@@ -22,6 +23,8 @@ const room: MatchRoom = {
   writable: true, lastSequence: 0, lastReadSequence: 0,
 };
 const signal = { roomId: room.id, communicationGeneration: 1 };
+const playerTopicHash = "cdb59355f3ba293977fc0945fb85f11822d412c45c7520c7121bd2234f6c1f48";
+const nextPlayerTopicHash = "7265e322a7982ee8cd8128512119dda951bfc1df0132acd372981a565ab19c8a";
 function connection() {
   let broadcast!: (event: { payload: unknown }) => void;
   let status!: (value: string) => void;
@@ -50,6 +53,11 @@ const advance = (ms: number) => act(async () => { await vi.advanceTimersByTimeAs
 
 beforeEach(() => {
   vi.useFakeTimers();
+  // jsdom lacks SubtleCrypto. Use a synchronous Node digest behind its async
+  // interface so fake timers never race native Web Crypto worker completion.
+  vi.stubGlobal("crypto", { subtle: { digest: vi.fn(async (_algorithm, input: Uint8Array) => {
+    return Uint8Array.from(createHash("sha256").update(input).digest()).buffer;
+  }) } });
   clients = [];
   mocks.userId = "player"; mocks.sessionId = "session"; mocks.signedIn = true;
   mocks.getToken.mockResolvedValue("test-token");
@@ -59,7 +67,7 @@ beforeEach(() => {
   Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
   Object.defineProperty(navigator, "onLine", { configurable: true, value: true });
 });
-afterEach(() => { cleanup(); vi.useRealTimers(); });
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 describe("Match Room private Realtime transport", () => {
   it("authenticates the exact private generation topic and resyncs every successful join", async () => {
@@ -67,7 +75,7 @@ describe("Match Room private Realtime transport", () => {
     const client = clients[0];
     expect(mocks.createClient).toHaveBeenCalledWith(mocks.getToken);
     expect(client.realtime.setAuth).toHaveBeenCalledWith("test-token");
-    expect(client.channel).toHaveBeenCalledExactlyOnceWith(`match-room:${room.id}:1`, {
+    expect(client.channel).toHaveBeenCalledExactlyOnceWith(`match-room:v2:${room.id}:1:${playerTopicHash}`, {
       config: { private: true, broadcast: { self: false, ack: false } },
     });
     expect(client.subscribedChannel.on).toHaveBeenCalledWith("broadcast", { event: "invalidate" }, expect.any(Function));
@@ -200,7 +208,7 @@ describe("Match Room private Realtime transport", () => {
     await advance(80);
     expect(refresh).not.toHaveBeenCalled();
     expect(stale.removeChannel).toHaveBeenCalledTimes(1);
-    expect(clients[1].channel).toHaveBeenCalledWith("match-room:replacement:2", expect.any(Object));
+    expect(clients[1].channel).toHaveBeenCalledWith(`match-room:v2:replacement:2:${playerTopicHash}`, expect.any(Object));
   });
 
   it("cleans up on session/identity change and does not join when signed out", async () => {
@@ -209,6 +217,7 @@ describe("Match Room private Realtime transport", () => {
     view.rerender({ activeRoom: room }); await flush();
     expect(clients[0].removeChannel).toHaveBeenCalledTimes(1);
     expect(clients).toHaveLength(2);
+    expect(clients[1].channel).toHaveBeenCalledWith(`match-room:v2:${room.id}:1:${nextPlayerTopicHash}`, expect.any(Object));
     mocks.signedIn = false;
     view.rerender({ activeRoom: room }); await flush();
     expect(clients[1].removeChannel).toHaveBeenCalledTimes(1);
@@ -218,6 +227,8 @@ describe("Match Room private Realtime transport", () => {
   it.each([
     ["kill switch", { ...room, writable: false }],
     ["completed", { ...room, writable: false, closedAt: "2026-09-20T00:00:00Z", closureReason: "match_completed" }],
+    ["nonparticipant staff", { ...room, viewerRegistrationId: null }],
+    ["mismatched registration", { ...room, viewerRegistrationId: "other" }],
     ["TBD/BYE/empty future", null],
   ] as const)("retains fallback without subscriptions for %s", async (_label, activeRoom) => {
     mount(activeRoom); await flush();

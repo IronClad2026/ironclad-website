@@ -17,6 +17,10 @@ const redirectMock = vi.hoisted(() =>
 const dashboardMock = vi.hoisted(() => vi.fn(() => null));
 
 vi.mock("@clerk/nextjs/server", () => ({ auth: authMock }));
+vi.mock("@/lib/patch2-admin-access", async () => {
+  const { createPatch2AdminAccessFixture } = await import("@/tests/fixtures/patch2-admin-access");
+  return createPatch2AdminAccessFixture(authMock);
+});
 vi.mock("next/navigation", () => ({ redirect: redirectMock }));
 vi.mock("@/lib/admin-operations", () => ({
   loadAdminOperationsMetrics: loadAdminOperationsMetricsMock,

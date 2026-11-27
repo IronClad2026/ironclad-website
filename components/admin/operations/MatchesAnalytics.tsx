@@ -48,7 +48,7 @@ export default function MatchesAnalytics({ metrics }: { metrics: AdminOperations
               value: metrics.matches.operationalHealth.underAdminReview,
             },
             {
-              label: "Admin Assistance",
+              label: "Earlier assistance",
               value:
                 metrics.matches.operationalHealth.pendingAdminAssistance,
             },

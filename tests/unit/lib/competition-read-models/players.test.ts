@@ -34,6 +34,8 @@ function identity(overrides: Record<string, unknown> = {}) {
     display_name: "Public Display Name",
     public_profile_enabled: true,
     account_closed_at: null,
+    profile_public: true,
+    optional_public: true,
     ...overrides,
   };
 }
@@ -217,7 +219,7 @@ function database(
             error: { message: "private provider details" },
           }).then(resolve, reject);
         let rows = (
-          table === "players"
+          table === "gaming_profile_disclosure"
             ? identityReadCount++ > 0
               ? (options.current ?? options.players ?? [identity()])
               : (options.players ?? [identity()])
@@ -291,6 +293,18 @@ describe("Relic-keyed player competition read model", () => {
     expect(await loadPlayerCompetitionHistoryByPlayerId(fixture.client, PLAYER_ID)).toEqual({ outcome: "HIDDEN" });
     expect(fixture.calls).toHaveLength(3);
     expect(loadTournaments).toHaveBeenCalledOnce();
+  });
+
+  it.each([false, undefined])("hides an active UUID when publication is %s", async (profilePublic) => {
+    const fixture = database({ players: [identity({ profile_public: profilePublic })] });
+    expect(await loadPlayerCompetitionHistoryByPlayerId(fixture.client, PLAYER_ID)).toEqual({ outcome: "HIDDEN" });
+    expect(loadTournaments).not.toHaveBeenCalled();
+  });
+
+  it("allows UUID history while denying optional Relic lookup for the same core profile", async () => {
+    const fixture = database({ players: [identity({ optional_public: false })] });
+    expect(await loadPlayerCompetitionHistory(fixture.client, RELIC_ID)).toEqual({ outcome: "HIDDEN" });
+    expect(await loadPlayerCompetitionHistoryByPlayerId(fixture.client, PLAYER_ID)).toMatchObject({ outcome: "FOUND_VISIBLE" });
   });
 
   it("rejects malformed public UUIDs before a query", async () => {
@@ -396,6 +410,7 @@ describe("Relic-keyed player competition read model", () => {
     { current: [] },
     { current: [identity({ account_closed_at: DATE, coh3_profile_id: null })] },
     { current: [identity({ coh3_profile_id: "999" })] },
+    { current: [identity({ profile_public: false, coh3_profile_id: null })] },
     {
       current: [
         identity({
@@ -431,7 +446,7 @@ describe("Relic-keyed player competition read model", () => {
     expect(player.entries[0].eventAlias).toBe("Historical Event Alias");
   });
 
-  it.each(["players", "registrations"])(
+  it.each(["gaming_profile_disclosure", "registrations"])(
     "throws a sanitized error for failed %s queries",
     async (table) => {
       const result = loadPlayerCompetitionHistory(
@@ -448,7 +463,7 @@ describe("Relic-keyed player competition read model", () => {
   it("does not convert rejected provider promises to not-found", async () => {
     await expect(
       loadPlayerCompetitionHistory(
-        database({ throwTable: "players" }).client,
+        database({ throwTable: "gaming_profile_disclosure" }).client,
         RELIC_ID,
       ),
     ).rejects.toMatchObject({ code: "QUERY_FAILED" });

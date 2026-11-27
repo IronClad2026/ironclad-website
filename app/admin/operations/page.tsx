@@ -4,9 +4,9 @@ import { redirect } from "next/navigation";
 import AdminOperationsDashboard from "@/components/admin/operations/AdminOperationsDashboard";
 import { loadAdminOperationsMetrics } from "@/lib/admin-operations";
 import { parseAdminOperationsPeriod } from "@/lib/admin-operations-metrics";
+import { hasCurrentPatch2AdminAccess } from "@/lib/patch2-admin-access";
 import { loadAdminWebsiteTraffic } from "@/lib/vercel-web-analytics";
 
-type CustomClaims = { metadata?: { role?: string } };
 type AdminOperationsPageProps = {
   searchParams: Promise<{ period?: string | string[] }>;
 };
@@ -14,10 +14,8 @@ type AdminOperationsPageProps = {
 export default async function AdminOperationsPage({
   searchParams,
 }: AdminOperationsPageProps) {
-  const { userId, sessionClaims } = await auth();
-  const role = (sessionClaims as CustomClaims | null)?.metadata?.role;
-
-  if (!userId || role !== "admin") redirect("/");
+  const { userId, sessionClaims, sessionId } = await auth();
+  if (!await hasCurrentPatch2AdminAccess(userId, sessionClaims, sessionId)) redirect("/");
 
   const params = await searchParams;
   const period = parseAdminOperationsPeriod(params.period);

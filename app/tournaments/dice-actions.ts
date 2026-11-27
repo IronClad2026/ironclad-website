@@ -8,15 +8,40 @@ import {
 } from "@/lib/account-legal-mutation-guard";
 import { isAccountLegalAcceptanceRpcError } from "@/lib/account-legal-rpc-error";
 import {
+  isMatchDiceId,
   isRollMatchDiceInput,
   parseMatchDiceRollRpcResult,
+  parseMatchDiceSnapshot,
+  type MatchDiceHistoryResult,
   type MatchDiceRollActionResult,
   type RollMatchDiceInput,
 } from "@/lib/match-dice";
+import { callVerifiedMatchStaff, getVerifiedMatchStaff } from "@/lib/match-staff-server";
 import { createAuthenticatedSupabaseClient } from "@/lib/supabase-server";
 
 const GENERIC_ROLL_ERROR =
   "Dice Roll-Off could not be completed. Refresh the Match and try again.";
+
+export async function getMatchDiceHistory(matchId: string): Promise<MatchDiceHistoryResult> {
+  if (!isMatchDiceId(matchId)) return { ok: false, code: "invalid_request" };
+
+  try {
+    const session = await auth();
+    if (!session.userId) return { ok: false, code: "auth_required" };
+    const args = { p_match_id: matchId };
+    const supabase = await createAuthenticatedSupabaseClient();
+    let result = await supabase.rpc("get_match_dice_rolloff", args);
+    if (result.error?.code === "42501" && result.error.message !== "PROFILE_NOTICE_REQUIRED") {
+      const staff = await getVerifiedMatchStaff(session, false);
+      if (staff) result = await callVerifiedMatchStaff(staff, "get_match_dice_rolloff", args);
+    }
+    if (result.error) return { ok: false, code: "unavailable" };
+    const snapshot = parseMatchDiceSnapshot(result.data, matchId);
+    return snapshot ? { ok: true, snapshot } : { ok: false, code: "unavailable" };
+  } catch {
+    return { ok: false, code: "unavailable" };
+  }
+}
 
 export async function rollMatchDice(
   input: RollMatchDiceInput

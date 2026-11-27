@@ -14,7 +14,7 @@ const query = new URLSearchParams(location.search);
 const player: PublicPlayerProfile = {
   id: "fixture-public-player", playerName: query.has("long") ? "SteelVanguard".repeat(8) : "Steel Vanguard",
   displayName: "Steel Vanguard", country: "Australia", region: "Oceania", currentElo: 1400,
-  publicProfileEnabled: true, discordPublicEnabled: query.has("discord"), discordUsername: query.has("discord") ? "steelvanguard" : null,
+  publicProfileEnabled: true, optionalProfileEnabled: true, discordPublicEnabled: query.has("discord"), discordUsername: query.has("discord") ? "steelvanguard" : null,
   avatarUrl: null, hasAvatar: false, createdAt: "2026-08-01T00:00:00Z",
 };
 const initialState: ShowcaseEditorState = {

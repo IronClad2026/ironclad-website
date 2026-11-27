@@ -2,10 +2,12 @@
 
 import {
   ClipboardList,
+  Bell,
   Clapperboard,
   Film,
   GitBranch,
   LayoutDashboard,
+  LifeBuoy,
   Map,
   Menu,
   Pencil,
@@ -29,6 +31,8 @@ export type TournamentManagementSection =
   | "overview"
   | "edit"
   | "registrations"
+  | "notifications"
+  | "assistance"
   | "players-waitlist"
   | "bracket"
   | "matches"
@@ -58,6 +62,8 @@ export const TOURNAMENT_MANAGEMENT_SECTIONS: readonly TournamentManagementMenuIt
       label: "Players / Waitlist",
       section: "players-waitlist",
     },
+    { icon: Bell, label: "Notifications", section: "notifications" },
+    { icon: LifeBuoy, label: "Assistance", section: "assistance" },
     { icon: GitBranch, label: "Bracket", section: "bracket" },
     { icon: Swords, label: "Matches / Results", section: "matches" },
     { icon: Film, label: "Replay Archive", section: "replays" },
@@ -317,7 +323,7 @@ export function TournamentDesktopSectionNavigation({
       aria-label="Tournament management sections"
       className="mt-4 hidden border-t border-white/10 pt-4 xl:block"
     >
-      <ul className="grid grid-cols-3 gap-1.5 2xl:grid-cols-10">
+      <ul className="grid grid-cols-3 gap-1.5 2xl:grid-cols-6">
         {TOURNAMENT_MANAGEMENT_SECTIONS.map((item) => {
           const Icon = item.icon;
           const active = activeSection === item.section;

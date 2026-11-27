@@ -186,6 +186,8 @@ const dictionary = {
       "Указанный результат рассматривает администратор. Откройте это сообщение, чтобы проверить отчёт.",
   },
   server: {
+    privateAssistanceReplyTitle: "Ответ администратора на личный запрос помощи",
+    privateAssistanceReplyMessage: "Администратор IronClad ответил. Откройте свой личный разговор.",
     matchMessageReceivedTitle: "Новое сообщение в комнате матча",
     matchMessageReceivedMessage: "В вашей комнате матча есть новые сообщения.",
     loadError: "Не удалось загрузить уведомления.",

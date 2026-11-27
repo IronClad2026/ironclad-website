@@ -1,8 +1,16 @@
 import { requireDivisionModelVersion } from "@/lib/division-model";
-import { auth } from "@clerk/nextjs/server";
-import { notFound, redirect } from "next/navigation";
+import Link from "next/link";
+import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
+import AdminAccessRequired from "@/components/admin/AdminAccessRequired";
+import { hasAdminPageAccess } from "@/lib/admin-page-access";
 import { loadAdminTournamentMediaWorkspace } from "@/app/admin/tournaments/media-actions";
+import AdminNotificationInbox from "@/components/admin/tournaments/AdminNotificationInbox";
+import AdminPrivateAssistance from "@/components/admin/tournaments/AdminPrivateAssistance";
+import LegacyRoomAssistance from "@/components/admin/tournaments/LegacyRoomAssistance";
+import { getAdminPrivateAssistanceQueue } from "@/app/admin/tournaments/assistance-actions";
+import { isAssistanceFilter, isAssistanceUuid } from "@/lib/private-assistance";
+import { isAdminNotificationInboxEnabled, loadAdminNotificationInbox } from "@/lib/admin-notification-inbox";
 import AdminBracketManagement from "@/components/AdminBracketManagement";
 import AdminTournamentMapPools from "@/components/AdminTournamentMapPools";
 import TournamentFormDraft from "@/components/TournamentFormDraft";
@@ -21,7 +29,10 @@ import TournamentOverview from "@/components/admin/tournaments/TournamentOvervie
 import TournamentWorkspaceHeader from "@/components/admin/tournaments/TournamentWorkspaceHeader";
 import { loadAdminTournamentMatchWorkspace } from "@/lib/admin-tournament-match-workspace";
 import { loadAdminTournamentReplayArchive } from "@/lib/admin-replay-archive";
-import { loadAdminTournamentRegistrationWorkspace } from "@/lib/admin-tournament-registration-workspace";
+import {
+  loadAdminTournamentRegistrationWorkspace,
+  type AdminTournamentRegistrationWorkspaceData,
+} from "@/lib/admin-tournament-registration-workspace";
 import {
   isAdminTournamentWorkspaceTerminal,
   loadAdminTournamentBracketWorkspaceData,
@@ -32,12 +43,6 @@ import {
   type AdminTournamentWorkspaceSummary,
   type AdminTournamentWorkspaceRow,
 } from "@/lib/admin-tournament-workspace";
-
-type CustomClaims = {
-  metadata?: {
-    role?: string;
-  };
-};
 
 type TournamentWorkspacePageProps = {
   params: Promise<{
@@ -50,10 +55,13 @@ type TournamentWorkspacePageProps = {
     filter?: string;
     focus?: string;
     notice?: string;
+    page?: string;
     section?: string;
     selected?: string;
     match?: string;
     room?: string;
+    legacyPage?: string;
+    legacyResolved?: string;
   }>;
 };
 
@@ -61,6 +69,8 @@ const VALID_SECTIONS = new Set<TournamentManagementSection>([
   "overview",
   "edit",
   "registrations",
+  "notifications",
+  "assistance",
   "players-waitlist",
   "bracket",
   "matches",
@@ -74,37 +84,56 @@ export default async function TournamentWorkspacePage({
   params,
   searchParams,
 }: TournamentWorkspacePageProps) {
-  const { userId, sessionClaims } = await auth();
-  const role = (sessionClaims as CustomClaims | null)?.metadata?.role;
-
-  if (!userId || role !== "admin") {
-    redirect("/");
+  const [{ tournamentId }, query] = await Promise.all([params, searchParams]);
+  const workspacePath = `/admin/tournaments/${tournamentId}`;
+  if (!(await hasAdminPageAccess(workspacePath, query))) {
+    return <AdminAccessRequired />;
   }
 
-  const [{ tournamentId }, query] = await Promise.all([params, searchParams]);
   if (!isUuid(tournamentId)) {
     notFound();
   }
 
-  const workspace = await loadAdminTournamentWorkspace(tournamentId);
+  const section = getSection(query?.section);
+  const [workspace, independentContent] = await Promise.all([
+    loadAdminTournamentWorkspace(tournamentId),
+    section === "assistance" || section === "notifications"
+      ? loadCommunicationSection(tournamentId.toLowerCase(), section, query)
+      : null,
+  ]);
   if (!workspace) {
     notFound();
   }
-
-  const section = getSection(query?.section);
-  const content = await renderWorkspaceSection({
+  const registrationData = section === "registrations" || section === "players-waitlist"
+    ? await loadAdminTournamentRegistrationWorkspace(workspace.tournament, workspace.summary.divisionStates, {
+        filter: query?.filter,
+        section,
+        selectedRegistrationId: query?.selected,
+        page: query?.page,
+      })
+    : null;
+  const content = independentContent ? independentContent(workspace.tournament.title) : await renderWorkspaceSection({
     query,
+    registrationData,
     section,
     summary: workspace.summary,
     tournament: workspace.tournament,
   });
+
+  // Scoped data can finish loading at different times. Keep it out of the
+  // response if closure or revocation committed during any of those reads.
+  if (!(await hasAdminPageAccess(workspacePath, query))) {
+    return <AdminAccessRequired />;
+  }
 
   return (
     <main className="min-h-screen min-w-0 overflow-x-hidden bg-black px-4 pt-24 pb-20 text-white sm:px-6 sm:pt-28">
       <section className="mx-auto max-w-7xl">
         <TournamentWorkspaceHeader
           activeSection={section}
-          summary={workspace.summary}
+          summary={registrationData
+            ? { ...workspace.summary, approvedPlayers: registrationData.counts.approved }
+            : workspace.summary}
           tournament={workspace.tournament}
         />
         {section === "overview" && query?.notice === "saved" && (
@@ -120,6 +149,68 @@ export default async function TournamentWorkspacePage({
       </section>
     </main>
   );
+}
+
+async function loadCommunicationSection(
+  tournamentId: string,
+  section: "assistance" | "notifications",
+  query: Awaited<TournamentWorkspacePageProps["searchParams"]>
+): Promise<(tournamentTitle: string) => ReactNode> {
+  const baseHref = `/admin/tournaments/${tournamentId}?section=${section}`;
+  if (section === "assistance") {
+    const [result, legacy] = await Promise.all([
+      getAdminPrivateAssistanceQueue({
+        tournamentId,
+        filter: isAssistanceFilter(query?.filter) ? query.filter : "all",
+        page: /^\d{1,9}$/.test(query?.page ?? "") ? Math.max(1, Number(query?.page)) : 1,
+        selectedId: isAssistanceUuid(query?.selected) ? query.selected : null,
+      }),
+      LegacyRoomAssistance({ tournamentId, page: query?.legacyPage, includeResolved: query?.legacyResolved === "1" }),
+    ]);
+    return function renderAssistance(tournamentTitle) {
+      return (
+        <>
+          {result.ok ? <AdminPrivateAssistance key={tournamentId} data={result.data} tournamentTitle={tournamentTitle} /> : (
+            <section role="alert" className="rounded-2xl border border-red-500/30 p-5 text-sm text-red-200">
+              <p>Private assistance could not be loaded. Outstanding requests have not been treated as an empty queue.</p>
+              <Link href={baseHref} className="inline-flex min-h-11 items-center text-orange-200 underline">Reopen assistance</Link>
+            </section>
+          )}
+          {legacy}
+        </>
+      );
+    };
+  }
+  if (!isAdminNotificationInboxEnabled()) {
+    return function renderDisabledInbox() {
+      return (
+        <section className="rounded-2xl border border-amber-500/25 p-5 text-sm text-amber-100">
+          <p role="status">The scoped admin inbox is turned off in this environment. Existing notifications remain saved.</p>
+          <Link href={`/admin/tournaments/${tournamentId}?section=assistance`} className="mt-3 inline-flex min-h-11 items-center text-orange-200 underline">Open assistance for this tournament</Link>
+          <Link href={`/admin/notifications/legacy-assistance?kind=tournament&tournamentId=${tournamentId}`} className="mt-3 inline-flex min-h-11 items-center text-orange-200 underline">Open legacy assistance requests for this tournament</Link>
+        </section>
+      );
+    };
+  }
+  try {
+    const data = await loadAdminNotificationInbox(
+      { kind: "tournament", tournamentId },
+      { page: query?.page, filter: query?.filter, selected: query?.selected }
+    );
+    return function renderInbox(tournamentTitle) {
+      return <AdminNotificationInbox data={data} title={`${tournamentTitle} — Notifications`} baseHref={baseHref} />;
+    };
+  } catch {
+    console.error("Tournament notification inbox load failed.");
+    return function renderInboxError() {
+      return (
+        <section role="alert" className="rounded-2xl border border-red-500/30 p-5 text-sm text-red-200">
+          <p>This tournament inbox could not be loaded. Its notification state has not been treated as empty.</p>
+          <Link href={baseHref} className="mt-3 inline-flex min-h-11 items-center text-orange-200 underline">Reopen tournament inbox</Link>
+        </section>
+      );
+    };
+  }
 }
 
 function WorkspaceNotice({
@@ -164,6 +255,7 @@ function WorkspaceNotice({
 
 async function renderWorkspaceSection({
   query,
+  registrationData,
   section,
   summary,
   tournament,
@@ -176,11 +268,15 @@ async function renderWorkspaceSection({
         filter?: string;
         focus?: string;
         notice?: string;
+        page?: string;
         selected?: string;
       match?: string;
       room?: string;
+      legacyPage?: string;
+      legacyResolved?: string;
       }
     | undefined;
+  registrationData: AdminTournamentRegistrationWorkspaceData | null;
   section: TournamentManagementSection;
   summary: AdminTournamentWorkspaceSummary;
   tournament: AdminTournamentWorkspaceRow;
@@ -222,20 +318,11 @@ async function renderWorkspaceSection({
     );
   }
 
-  if (section === "registrations" || section === "players-waitlist") {
-    const data = await loadAdminTournamentRegistrationWorkspace(
-      tournament,
-      summary.divisionStates,
-      {
-        filter: query?.filter,
-        section,
-        selectedRegistrationId: query?.selected,
-      }
-    );
+  if (registrationData && (section === "registrations" || section === "players-waitlist")) {
     return (
       <AdminTournamentRegistrations
-        key={`${tournament.id}:${section}`}
-        data={data}
+        key={`${tournament.id}:${section}:${registrationData.activeFilter}:${registrationData.page}`}
+        data={registrationData}
         detail={query?.detail}
         focus={getRegistrationFocus(query?.focus)}
         notice={query?.notice}

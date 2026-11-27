@@ -28,7 +28,9 @@ describe("Admin Tournament Media workspace contract", () => {
       '{ icon: Clapperboard, label: "Media", section: "media" }'
     );
     expect(menu).toContain("?section=${item.section}");
-    expect(menu).toContain("2xl:grid-cols-10");
+    expect(menu).toContain('section: "notifications"');
+    expect(menu).toContain('section: "assistance"');
+    expect(menu).toContain("2xl:grid-cols-6");
     expect(header).toContain('media: "Media"');
   });
 

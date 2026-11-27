@@ -37,6 +37,15 @@ const KNOWN_TYPES = [
 ] as const;
 
 describe("localized notification copy", () => {
+  it.each(SUPPORTED_LOCALES)("localizes private admin replies in %s without exposing private text", async (locale) => {
+    const dictionary = await loadDictionary(locale, "notifications");
+    const copy = localizePlayerNotificationCopy({ type: "assistance.admin_replied", tournamentTitle: "PRIVATE_TOURNAMENT",
+      metadata: { body: "PRIVATE_MESSAGE", actorClerkUserId: "PRIVATE_ACTOR" } }, dictionary);
+    expect(copy).toEqual({ title: dictionary.server.privateAssistanceReplyTitle, message: dictionary.server.privateAssistanceReplyMessage });
+    expect(JSON.stringify(copy)).not.toContain("PRIVATE_");
+    expect(copy?.message.trim().length).toBeGreaterThan(0);
+    if (locale !== "en") expect(copy?.message).not.toBe(notificationsEnglish.server.privateAssistanceReplyMessage);
+  });
   it.each(SUPPORTED_LOCALES)("uses generic message episode copy in %s without private metadata", async (locale) => {
     const dictionary = await loadDictionary(locale, "notifications");
     const copy = localizePlayerNotificationCopy({

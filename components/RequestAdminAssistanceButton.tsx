@@ -4,10 +4,10 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { getMatchRoomOpponentDiscord } from "@/app/tournaments/support-actions";
 import { useOptionalLocale } from "@/components/i18n/LocaleProvider";
 import { getMatchRoomCopy } from "@/lib/i18n/match-room";
-import MatchRoomAssistanceControls from "@/components/MatchRoomAssistanceControls";
+import PrivateMatchAssistance from "@/components/PrivateMatchAssistance";
 
 export default function RequestAdminAssistanceButton({ roomId }: { matchId: string; roomId: string; roomRevision: number }) {
-  return <MatchRoomAssistanceControls roomId={roomId} />;
+  return <PrivateMatchAssistance roomId={roomId} />;
 }
 
 export function MatchRoomSupportFooter(props: {

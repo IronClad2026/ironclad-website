@@ -1,8 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { LifeBuoy } from "lucide-react";
-import { getMatchRoomAssistance, requestMatchAdminAssistance, resolveMatchAdminAssistance } from "@/app/tournaments/support-actions";
+import { getMatchRoomAssistance, resolveMatchAdminAssistance } from "@/app/tournaments/support-actions";
 import { useOptionalLocale } from "@/components/i18n/LocaleProvider";
 import { getMatchRoomCopy } from "@/lib/i18n/match-room";
 import type { MatchRoomAssistance } from "@/lib/match-room-assistance";
@@ -16,7 +15,7 @@ function AssistanceSession({ roomId, admin = false }: { roomId: string; admin?: 
   const [state, setState] = useState<MatchRoomAssistance | null>(null);
   const [failed, setFailed] = useState(false);
   const [actionFailed, setActionFailed] = useState(false);
-  const [pending, setPending] = useState<"request" | "resolve" | null>(null);
+  const [pending, setPending] = useState(false);
   const scope = useRef({ mounted: false, generation: 0 });
   const mutating = useRef(false);
   const loading = useRef(false);
@@ -58,14 +57,14 @@ function AssistanceSession({ roomId, admin = false }: { roomId: string; admin?: 
     };
   }, [refresh]);
 
-  async function mutate(action: "request" | "resolve") {
+  async function resolve() {
     if (!state || failed || mutating.current) return;
     mutating.current = true;
     scope.current.generation++;
-    setPending(action);
+    setPending(true);
     setActionFailed(false);
     try {
-      const result = await (action === "resolve" ? resolveMatchAdminAssistance : requestMatchAdminAssistance)({
+      const result = await resolveMatchAdminAssistance({
         roomId, expectedRequestVersion: state.requestVersion,
       });
       if (!scope.current.mounted) return;
@@ -79,7 +78,7 @@ function AssistanceSession({ roomId, admin = false }: { roomId: string; admin?: 
     } catch { if (scope.current.mounted) setActionFailed(true); }
     finally {
       mutating.current = false;
-      if (scope.current.mounted) { setPending(null); void refresh(); }
+      if (scope.current.mounted) { setPending(false); void refresh(); }
     }
   }
 
@@ -91,16 +90,12 @@ function AssistanceSession({ roomId, admin = false }: { roomId: string; admin?: 
           state.status === "requested" ? copy.assistanceStatusRequested :
           state.status === "resolved" ? copy.assistanceStatusResolved : copy.assistanceStatusNone}
       </p>
-      {state && (state.status !== "requested" ? (
-        <button type="button" disabled={pending !== null || failed} onClick={() => void mutate("request")} className={buttonClass}>
-          <LifeBuoy size={16} aria-hidden="true" />
-          {pending === "request" ? copy.assistancePending : state.status === "resolved" ? (admin ? copy.assistanceReopen : copy.assistanceRequestAgain) : copy.assistanceLabel}
+      {state?.status === "requested" && state.canResolve && (
+        <button type="button" disabled={pending || failed} onClick={() => void resolve()} className={buttonClass}>
+          {pending ? copy.assistanceResolving : copy.assistanceResolve}
         </button>
-      ) : state.canResolve ? (
-        <button type="button" disabled={pending !== null || failed} onClick={() => void mutate("resolve")} className={buttonClass}>
-          {pending === "resolve" ? copy.assistanceResolving : copy.assistanceResolve}
-        </button>
-      ) : null)}
+      )}
+      {admin && <p className="text-xs text-zinc-500">Earlier shared request history. Use the tournament Assistance section for private conversations. Textless request creation and reopening are retired.</p>}
       {actionFailed && <p role="alert" className="text-sm text-orange-200">{copy.assistanceActionFailed}</p>}
       {failed && <button type="button" onClick={() => void refresh()} className={buttonClass}>{copy.retry}</button>}
     </section>

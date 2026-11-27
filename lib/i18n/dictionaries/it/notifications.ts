@@ -191,6 +191,8 @@ const dictionary = {
       "Il Risultato segnalato è in revisione da parte dell'amministratore. Apri questo messaggio per esaminare la segnalazione.",
   },
   server: {
+    privateAssistanceReplyTitle: "Risposta degli admin all’assistenza privata",
+    privateAssistanceReplyMessage: "Un admin IronClad ha risposto. Apri la tua conversazione privata.",
     matchMessageReceivedTitle: "Nuovo messaggio nella sala del match",
     matchMessageReceivedMessage: "Hai nuovi messaggi nella sala del match.",
     loadError: "Impossibile caricare le notifiche.",

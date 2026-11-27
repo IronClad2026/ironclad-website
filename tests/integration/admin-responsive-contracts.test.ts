@@ -52,28 +52,16 @@ describe("admin responsive component and CSS contracts", () => {
       'className="min-h-screen min-w-0 overflow-x-hidden bg-black px-4 pt-28 pb-20 text-white sm:px-6 sm:pt-32"'
     );
     expect(registrationsPage).toContain(
-      'className="min-h-screen overflow-x-hidden bg-black px-4 pt-28 pb-16 text-white sm:px-6 sm:pt-32"'
+      'className="min-h-screen min-w-0 overflow-x-hidden bg-black px-4 pt-28 pb-16 text-white sm:px-6 sm:pt-32"'
     );
     expect(registrationsPage).toContain(
-      "data-registration-tournament-group={group.key}"
+      'aria-label="Tournament registration workspaces"'
     );
     expect(registrationsPage).toContain(
-      'className="group min-w-0 overflow-hidden rounded-2xl border border-white/10'
+      'className="mt-6 grid min-w-0 gap-3 sm:grid-cols-2"'
     );
     expect(registrationsPage).toContain(
-      'className="cursor-pointer list-none px-4 py-4'
-    );
-    expect(registrationsPage).toContain(
-      'className="flex min-w-0 gap-2 overflow-x-auto overscroll-x-contain pb-1"'
-    );
-    expect(registrationsPage).toContain(
-      'className="group/archive rounded-2xl border border-white/10'
-    );
-    expect(registrationsPage).toContain(
-      'className="flex min-h-11 cursor-pointer list-none items-center justify-between'
-    );
-    expect(registrationsPage).toContain(
-      "group-open/archive:rotate-180"
+      "min-h-20 min-w-0 flex-col"
     );
     expect(tournamentListPage).toContain(
       'className="min-h-screen min-w-0 overflow-x-hidden bg-black px-4 pt-28 pb-20 text-white sm:px-6 sm:pt-32"'
@@ -153,7 +141,7 @@ describe("admin responsive component and CSS contracts", () => {
     );
     expect(tournamentManagementMenu).toContain("flex min-h-11 items-center");
     expect(tournamentManagementMenu).toContain(
-      "grid grid-cols-3 gap-1.5 2xl:grid-cols-10"
+      "grid grid-cols-3 gap-1.5 2xl:grid-cols-6"
     );
   });
 

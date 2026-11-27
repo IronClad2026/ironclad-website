@@ -13,6 +13,7 @@ const player: PublicPlayerProfile = {
   region: "Oceania",
   currentElo: 1450,
   publicProfileEnabled: true,
+  optionalProfileEnabled: true,
   discordPublicEnabled: false,
   discordUsername: null,
   hasAvatar: true,
@@ -33,6 +34,9 @@ describe("PublicPlayerCard", () => {
     ).toHaveAttribute("href", `/players/${player.id}`);
     expect(screen.getByText("IronTester")).toBeInTheDocument();
     expect(screen.getByText("1,450")).toBeInTheDocument();
+    const avatar = screen.getByRole("img", { name: "IronTester avatar" }).querySelector("img");
+    expect(avatar).toHaveAttribute("src", player.avatarUrl);
+    expect(avatar).toHaveAttribute("loading", "lazy");
     expect(
       screen.queryByText("Discord contact available")
     ).not.toBeInTheDocument();

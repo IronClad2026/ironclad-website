@@ -1,4 +1,5 @@
 import { isValidElement, type ElementType, type ReactElement, type ReactNode } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -8,6 +9,9 @@ import {
 } from "@/tests/fixtures/auth";
 
 const authMock = vi.hoisted(() => vi.fn());
+const redirectToSignInMock = vi.hoisted(() => vi.fn(({ returnBackUrl }: { returnBackUrl: string }) => {
+  throw new Error(`CLERK_SIGN_IN:${returnBackUrl}`);
+}));
 const redirectMock = vi.hoisted(() =>
   vi.fn((href: string) => {
     throw new Error(`NEXT_REDIRECT:${href}`);
@@ -19,6 +23,10 @@ const loadTournamentDivisionStatesMock = vi.hoisted(() => vi.fn());
 const notificationCenterMock = vi.hoisted(() => vi.fn(() => null));
 
 vi.mock("@clerk/nextjs/server", () => ({ auth: authMock }));
+vi.mock("@/lib/patch2-admin-access", async () => {
+  const { createPatch2AdminAccessFixture } = await import("@/tests/fixtures/patch2-admin-access");
+  return createPatch2AdminAccessFixture(authMock);
+});
 vi.mock("next/navigation", () => ({ redirect: redirectMock }));
 vi.mock("@/lib/supabase-admin", () => ({
   createSupabaseAdminClient: createSupabaseAdminClientMock,
@@ -57,11 +65,16 @@ describe("Admin Command Center and global Registrations authorization", () => {
     ["signed-out", anonymousIdentity],
     ["non-Admin", playerIdentity],
   ])("denies a %s identity before either route loads private data", async (_, identity) => {
-    authMock.mockResolvedValue(identity);
+    authMock.mockResolvedValue({ ...identity, redirectToSignIn: redirectToSignInMock });
 
-    await expect(AdminPage({ searchParams: Promise.resolve({}) })).rejects.toThrow(
-      "NEXT_REDIRECT:/"
-    );
+    if (identity.userId) {
+      const page = await AdminPage({ searchParams: Promise.resolve({}) });
+      expect(renderToStaticMarkup(page)).toContain("Administrator access required");
+    } else {
+      await expect(AdminPage({ searchParams: Promise.resolve({}) })).rejects.toThrow(
+        "CLERK_SIGN_IN:/admin"
+      );
+    }
     await expect(
       AdminRegistrationsPage({ searchParams: Promise.resolve({}) })
     ).rejects.toThrow("NEXT_REDIRECT:/");
@@ -112,7 +125,7 @@ describe("Admin Command Center and global Registrations authorization", () => {
     expect(createSupabaseAdminClientMock).not.toHaveBeenCalled();
   });
 
-  it("loads compact summary data, central Division states, and the Admin Notification Center", async () => {
+  it("loads compact summaries and links to separate inboxes without loading global notifications", async () => {
     const registrationSelect = vi.fn().mockResolvedValue({
       data: [
         { registration_status: "pending" },
@@ -172,15 +185,11 @@ describe("Admin Command Center and global Registrations authorization", () => {
       supabase,
       tournamentRows
     );
-    expect(loadAdminNotificationsMock).toHaveBeenCalledExactlyOnceWith(50);
-    expect(notificationCenter?.props).toMatchObject({
-      scope: "admin",
-      title: "Admin Notification Center",
-      notifications: [],
-      totalCount: 0,
-      unreadCount: 0,
-      error: null,
-    });
+    expect(loadAdminNotificationsMock).not.toHaveBeenCalled();
+    expect(notificationCenter).toBeNull();
+    expect(textContent(page)).toContain("Choose a tournament inbox");
+    expect(textContent(page)).toContain("Platform notifications");
+    expect(textContent(page)).toContain("Legacy / unassigned notifications");
     expect(textContent(page)).toContain("Academy Bracket: Filling — 1/8");
     expect(textContent(page)).toContain("Challenge Bracket: Disabled");
     expect(textContent(page)).toContain("Main / Pro Bracket: Disabled");

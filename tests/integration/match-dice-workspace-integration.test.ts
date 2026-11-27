@@ -34,9 +34,9 @@ describe("authenticated match dice workspace integration", () => {
     expect(source).not.toContain("diceHistory:");
   });
 
-  it("uses the sanitized authenticated read RPC and participant Server Action", () => {
-    expect(source).toContain('"get_match_dice_rolloff"');
-    expect(source).toContain("parseMatchDiceSnapshot");
+  it("uses the guarded history and participant roll Server Actions", () => {
+    expect(source).toContain("getMatchDiceHistory");
+    expect(source).not.toContain('"get_match_dice_rolloff"');
     expect(source).toContain("rollMatchDice");
     expect(source).not.toContain("createSupabaseAdminClient");
   });

@@ -38,11 +38,18 @@ export default function AdminTournamentRegistrations({
   const baseHref = `/admin/tournaments/${encodeURIComponent(tournament.id)}?section=${section}`;
   const filters: AdminTournamentRegistrationFilter[] = playersView
     ? ["all", "approved", "waitlisted"]
-    : ["all", "pending", "manual_review", "approved", "rejected", "withdrawn"];
-  const formId = `tournament-registration-bulk-${tournament.id}`;
+    : ["all", "pending", "manual_review", "approved", "rejected", "waitlisted", "withdrawn"];
+  const selectionScope = `${tournament.id}:${section}:${data.activeFilter}:${data.page}`;
+  const selectionRevision = data.rows
+    .map((row) => `${row.registrationId}:${row.status}:${row.isDivisionLaunched}`)
+    .join("|");
+  const formId = `tournament-registration-bulk-${selectionScope}`;
+  const pageHref = (page: number) =>
+    `${baseHref}&filter=${data.activeFilter}&page=${page}`;
 
   return (
     <section
+      key={`${selectionScope}:${selectionRevision}`}
       aria-labelledby="tournament-registration-workspace-title"
       className="min-w-0"
     >
@@ -83,11 +90,12 @@ export default function AdminTournamentRegistrations({
                   name="workspaceSection"
                   value={section}
                 />
+                <input type="hidden" name="workspacePage" value={data.page} />
               </form>
               <AdminRegistrationApproveSelected
                 formId={formId}
                 name="registrationId"
-                scope={tournament.id}
+                scope={selectionScope}
                 className="shrink-0"
               />
             </>
@@ -112,6 +120,11 @@ export default function AdminTournamentRegistrations({
         </div>
 
         <RegistrationNotice notice={notice} detail={detail} />
+        {data.selectedRegistrationUnavailable && (
+          <p role="alert" className="mt-4 text-sm text-amber-200">
+            The selected registration is unavailable in this Tournament. Select a record below.
+          </p>
+        )}
 
         <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {data.cohortSummaries.map((summary) => {
@@ -162,7 +175,7 @@ export default function AdminTournamentRegistrations({
           <div className="flex items-center gap-2 text-amber-300">
             <Clock3 aria-hidden="true" size={18} />
             <p className="text-xs font-black uppercase tracking-wider">
-              FIFO Waitlist
+              FIFO Waitlist — this page
             </p>
           </div>
           <div className="mt-3 space-y-2 text-sm leading-6 text-amber-50/90">
@@ -186,7 +199,9 @@ export default function AdminTournamentRegistrations({
               {playersView ? "Roster records" : "Registration records"}
             </p>
             <p className="mt-1 break-words text-sm text-zinc-400">
-              Showing {data.rows.length} of {data.counts.all} in this workspace.
+              Showing {data.filteredCount === 0 ? 0 : (data.page - 1) * data.pageSize + 1}
+              –{(data.page - 1) * data.pageSize + data.rows.length} of {data.filteredCount}
+              {" "}matching records, oldest first. Select all applies to this page only.
             </p>
           </div>
           {!playersView && (
@@ -194,30 +209,47 @@ export default function AdminTournamentRegistrations({
               <AdminRegistrationSelectAll
                 formId={formId}
                 name="registrationId"
-                scope={tournament.id}
+                scope={selectionScope}
                 showLabel
                 className="w-full"
               />
               <AdminRegistrationApproveSelected
                 formId={formId}
                 name="registrationId"
-                scope={tournament.id}
+                scope={selectionScope}
               />
             </div>
           )}
         </div>
 
         <AdminRegistrationReviewRows
+          key={selectionScope}
           registrations={data.rows}
           activeFilter={data.activeFilter}
           formId={playersView ? `${formId}-read-only` : formId}
-          selectionScope={tournament.id}
+          selectionScope={selectionScope}
           isTournamentTerminal={data.selectedRegistrationIsTerminal}
           updateRegistrationStatusAction={updateRegistrationStatus}
-          returnHref={baseHref}
+          returnHref={`${baseHref}&page=${data.page}`}
           workspaceTournamentId={tournament.id}
           workspaceSection={section}
+          workspacePage={data.page}
         />
+        {data.pageCount > 1 && (
+          <nav aria-label="Registration pages" className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4 text-sm">
+            {data.page > 1 ? (
+              <Link href={pageHref(data.page - 1)} className="inline-flex min-h-11 items-center rounded-xl border border-white/15 px-4 text-zinc-200 hover:border-orange-400/50">
+                Previous
+              </Link>
+            ) : <span />}
+            <span className="text-zinc-400">Page {data.page} of {data.pageCount}</span>
+            {data.page < data.pageCount ? (
+              <Link href={pageHref(data.page + 1)} className="inline-flex min-h-11 items-center rounded-xl border border-white/15 px-4 text-zinc-200 hover:border-orange-400/50">
+                Next
+              </Link>
+            ) : <span />}
+          </nav>
+        )}
       </div>
 
       {data.rows.length === 0 && (
@@ -236,6 +268,7 @@ export default function AdminTournamentRegistrations({
           section={section}
           terminal={data.selectedRegistrationIsTerminal}
           tournamentId={tournament.id}
+          page={data.page}
           updateRegistrationStatusAction={updateRegistrationStatus}
         />
       )}
@@ -256,7 +289,11 @@ function RegistrationNotice({
   const warning = notice === "registration-bulk-partial";
   const message =
     detail ||
-    (notice === "registration-bulk-approved"
+    (notice === "registration-scope-required"
+      ? "Open a Tournament workspace and select its registrations before taking this action."
+      : notice === "registration-scope-mismatch"
+        ? "No changes were made. Every selected registration must belong to this Tournament."
+      : notice === "registration-bulk-approved"
       ? "Selected registration(s) approved."
       : notice === "registration-bulk-partial"
         ? "Some selected registration(s) were approved. Others failed validation."

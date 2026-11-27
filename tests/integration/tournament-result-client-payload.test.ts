@@ -374,6 +374,8 @@ function createPageClient(
       inGameName?: string;
       playerId?: string;
       publicProfileEnabled?: boolean;
+      profilePublic?: boolean;
+      optionalPublic?: boolean;
     }
   > = {},
   viewerEloVerificationSource: string | null = "relic",
@@ -497,6 +499,8 @@ function createPageClient(
       id: profile?.playerId ?? registration.id,
       in_game_name: profile?.inGameName ?? registration.player_name,
       public_profile_enabled: profile?.publicProfileEnabled ?? true,
+      profile_public: profile?.profilePublic ?? true,
+      optional_public: profile?.optionalPublic ?? true,
     };
   });
   const results: Record<string, QueryResult> = {
@@ -505,7 +509,7 @@ function createPageClient(
       error: tournamentError,
     },
     registrations: { data: registrations, error: null },
-    players: { data: players, error: null },
+    gaming_profile_disclosure: { data: players, error: null },
     tournament_bracket_map_pool_entries: { data: [], error: null },
     tournament_media: { data: [], error: null },
     generated_brackets: {
@@ -544,15 +548,13 @@ function createPageClient(
     error: verifiedDivisionError,
   });
   const registrationQuery = createQuery(results.registrations);
-  const participantPlayersQuery = createQuery(results.players);
-  let playerQueryCount = 0;
+  const participantPlayersQuery = createQuery(results.gaming_profile_disclosure);
   const from = vi.fn((table: string) => {
     if (table === "players") {
-      playerQueryCount += 1;
-      return playerQueryCount === 1
-        ? viewerDivisionQuery
-        : participantPlayersQuery;
+      return viewerDivisionQuery;
     }
+
+    if (table === "gaming_profile_disclosure") return participantPlayersQuery;
 
     if (table === "registrations") {
       return registrationQuery;
@@ -934,7 +936,7 @@ describe("tournament Client Component result payload", () => {
     ).mock.calls[0];
 
     expect(selectedColumns).toBe(
-      "id, clerk_user_id, account_closed_at"
+      "id, clerk_user_id, account_closed_at, profile_public, optional_public"
     );
     expect(participant).toEqual(
       expect.objectContaining({
@@ -1024,6 +1026,21 @@ describe("tournament Client Component result payload", () => {
     );
     expect(serializePrivacyValue(tournament.participants)).not.toContain("Italy");
     expect(serializePrivacyValue(tournament.participants)).not.toContain("1605");
+  });
+
+  it("keeps the approved event entry, public profile and event ELO when optional details are withheld", async () => {
+    const { props } = await loadClientProps({
+      admin: false,
+      participantProfiles: { [SECRET_PLAYER_ID]: { profilePublic: true, optionalPublic: false, publicProfileEnabled: true } },
+    });
+    const [tournament] = props.tournaments as Array<{ participants: Array<{ name: string }> }>;
+    expect(tournament.participants.find((entry) => entry.name === "Safe Viewer")).toMatchObject({
+      registrationId: VIEWER_REGISTRATION_ID,
+      status: "approved",
+      profileHref: `/players/${VIEWER_REGISTRATION_ID}`,
+      country: null,
+      elo: 1500,
+    });
   });
 
   it("excludes generated brackets from the prelaunch public payload", async () => {

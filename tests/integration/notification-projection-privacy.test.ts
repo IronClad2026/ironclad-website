@@ -333,7 +333,7 @@ describe("notification browser privacy boundary", () => {
     consoleError.mockRestore();
   });
 
-  it("rejects invalid Admin notification counts instead of reporting empty work", async () => {
+  it("retires the unscoped Admin inbox loader without reading privileged rows", async () => {
     createSupabaseAdminClientMock.mockReturnValue(
       createNotificationLoadClient({
         notification: { data: [], error: null, count: null },
@@ -348,8 +348,9 @@ describe("notification browser privacy boundary", () => {
       notifications: [],
       totalCount: 0,
       unreadCount: 0,
-      error: "Notifications could not be loaded.",
+      error: "Open a tournament Notifications workspace or choose a scoped Admin inbox.",
     });
+    expect(createSupabaseAdminClientMock).not.toHaveBeenCalled();
   });
 
   it("does not persist a reviewer Clerk ID in report-group review notifications", async () => {
@@ -477,7 +478,7 @@ function createNotificationContextClient() {
 }
 
 function createNotificationProjectionClient(row: Record<string, unknown>) {
-  type MethodName = "eq" | "is" | "limit" | "order" | "select";
+  type MethodName = "eq" | "or" | "is" | "limit" | "order" | "select";
   type Result = {
     count: number | null;
     data: unknown;
@@ -498,6 +499,7 @@ function createNotificationProjectionClient(row: Record<string, unknown>) {
 
     for (const method of [
       "eq",
+      "or",
       "is",
       "limit",
       "order",
@@ -554,7 +556,7 @@ type NotificationQueryResult = {
 };
 
 function createNotificationQuery(result: NotificationQueryResult) {
-  type MethodName = "eq" | "is" | "limit" | "order" | "select";
+  type MethodName = "eq" | "or" | "is" | "limit" | "order" | "select";
   type Method = (...args: unknown[]) => Query;
   type Query = PromiseLike<NotificationQueryResult> &
     Record<MethodName, Method>;
@@ -562,7 +564,7 @@ function createNotificationQuery(result: NotificationQueryResult) {
   const target: Partial<Query> = {};
   const query = target as Query;
 
-  for (const method of ["eq", "is", "limit", "order", "select"] as const) {
+  for (const method of ["eq", "or", "is", "limit", "order", "select"] as const) {
     target[method] = () => query;
   }
   target.then = (resolve, reject) =>

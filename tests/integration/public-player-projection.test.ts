@@ -25,6 +25,7 @@ const publicRow = {
   region: "Oceania",
   current_elo: 1450,
   public_profile_enabled: true,
+  optional_profile_enabled: true,
   discord_public_enabled: false,
   discord_username: "must-not-leak",
   has_avatar: true,
@@ -52,7 +53,7 @@ describe("public-player projection", () => {
     expect(createNoStoreSupabaseClientMock).toHaveBeenCalledOnce();
     expect(supabase.calls.find((call) => call.method === "select")?.args[0])
       .toBe(
-        "id, display_name, player_name, country, region, current_elo, discord_public_enabled, discord_username, has_avatar, avatar_url, created_at"
+        "id, display_name, player_name, country, region, current_elo, optional_profile_enabled, discord_public_enabled, discord_username, has_avatar, avatar_url, created_at"
       );
     expect(supabase.calls).not.toContainEqual({
       method: "eq",
@@ -67,6 +68,7 @@ describe("public-player projection", () => {
         region: "Oceania",
         currentElo: 1450,
         publicProfileEnabled: true,
+        optionalProfileEnabled: true,
         discordPublicEnabled: false,
         discordUsername: null,
         hasAvatar: true,
@@ -99,6 +101,23 @@ describe("public-player projection", () => {
         avatarUrl: `/players/${publicRow.id}/avatar`,
       },
     ]);
+  });
+
+  it("keeps the public gaming profile and Discord choice while withholding optional personal details", async () => {
+    const supabase = createSupabaseQueryMock({
+      data: [{ ...publicRow, optional_profile_enabled: false,
+        discord_public_enabled: true, discord_username: "public-discord-name" }],
+    });
+    publicSupabaseClientMock.from.mockImplementation(supabase.from);
+
+    await expect(getPublicPlayers()).resolves.toEqual([{
+      id: publicRow.id, playerName: "IronTester", displayName: "IronTester",
+      country: null, region: "Oceania", currentElo: 1450, createdAt: null,
+      hasAvatar: false, avatarUrl: null, publicProfileEnabled: true,
+      optionalProfileEnabled: false, discordPublicEnabled: true, discordUsername: "public-discord-name",
+    }]);
+    expect(supabase.calls.filter(({ method }) => method === "order").at(-1)?.args)
+      .toEqual(["id", { ascending: true }]);
   });
 
   it("neutralizes an inconsistent Discord opt-in with no usable username", async () => {

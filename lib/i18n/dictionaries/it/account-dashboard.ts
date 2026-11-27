@@ -3,7 +3,7 @@ import type { DictionaryShape } from "@/lib/i18n/types";
 const dictionary = {
   showcase: {
     highlightProviderProcessing: "Cloudflare Workers verifica l’accesso al caricamento e conserva clip e immagini di anteprima nello spazio R2 privato. Cloudflare riceve anche metadati di rete e delle richieste.",
-    highlightProviderVisibility: "I clip idonei sui profili dei giocatori attivi sono pubblici. I clip nascosti e quelli degli account chiusi non possono essere riprodotti pubblicamente.",
+    highlightProviderVisibility: "I visitatori possono riprodurre i clip idonei quando il tuo profilo è pubblico. Le limitazioni del profilo e la moderazione dei clip si applicano anche alla riproduzione.",
     highlightProviderDeletion: "Rimuovere una clip o chiudere l’account la nasconde immediatamente. La pulizia dello spazio di archiviazione avviene in modo asincrono.",
     highlightProviderPrivacy: "Informativa sulla privacy di Cloudflare",
     highlightProviderOpensNewTab: "Si apre in una nuova scheda",
@@ -12,11 +12,11 @@ const dictionary = {
     latestEmpty: "Nessun pensiero salvato.",
     conflictResolved: "Ultima versione salvata caricata. Il tuo pensiero non salvato è stato mantenuto. Controllalo prima di salvarlo.",
     title: "Vetrina del giocatore",
-    description: "Personalizza il tuo profilo pubblico con un pensiero del momento e un traguardo conquistato.",
+    description: "Scegli un pensiero del momento e un traguardo conquistato per la tua vetrina.",
     manage: "Gestisci la vetrina",
     backToDashboard: "Torna alla dashboard",
     publicProfile: "Profilo pubblico",
-    publicVisibilityHelp: "Il tuo pensiero del momento e il traguardo in evidenza appaiono sul tuo profilo pubblico.",
+    publicVisibilityHelp: "Quando il tuo profilo è pubblico, i visitatori possono vedere il traguardo in evidenza e il pensiero del momento se è visibile.",
     viewPublicProfile: "Vedi il profilo pubblico",
     thoughtTitle: "Pensiero del momento",
     thoughtHelp: "Massimo 160 caratteri di testo semplice. Le emoji sono ammesse; quelle combinate possono contare come più caratteri.",

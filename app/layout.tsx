@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { ClerkProvider } from "@clerk/nextjs";
+import { headers } from "next/headers";
 
 import "./globals.css";
 
@@ -18,6 +19,7 @@ import { loadClerkLocalization } from "@/lib/i18n/clerk";
 import { loadDictionary } from "@/lib/i18n/loaders";
 import { getRequestLocale } from "@/lib/i18n/request";
 import { getLegalDocument } from "@/lib/legal-corpus-publication";
+import { isPublicProfileNoticeInstalled, NOTICE_LAYOUT_HEADER } from "@/lib/public-gaming-profile-notice";
 
 const icons: Metadata["icons"] = {
   icon: [
@@ -79,6 +81,17 @@ export default async function RootLayout({
   children: ReactNode;
 }>) {
   const locale = await getRequestLocale();
+  // Proxy discards incoming copies of this header before assigning either
+  // layout. No private navbar/badge queries run in the access-only layout.
+  if (isPublicProfileNoticeInstalled() && (await headers()).get(NOTICE_LAYOUT_HEADER)) {
+    return (
+      <ClerkProvider localization={await loadClerkLocalization(locale)}>
+        <html lang={locale}>
+          <body>{children}</body>
+        </html>
+      </ClerkProvider>
+    );
+  }
   const isVercelProduction = process.env.VERCEL_ENV === "production";
   const [common, clerkLocalization, legalRuntime] = await Promise.all([
     loadDictionary(locale, "common"),

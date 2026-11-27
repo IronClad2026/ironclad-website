@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import RulesExperience, {
   type RuleDocumentSummary,
 } from "@/components/rules/RulesExperience";
+import StagingProfilePolicyReviewLink from "@/components/legal/StagingProfilePolicyReviewLink";
 import { loadDictionary } from "@/lib/i18n/loaders";
 import { getRequestLocale } from "@/lib/i18n/request";
 import {
@@ -50,11 +51,14 @@ export default async function RulesPage() {
   getLegalDocument("privacy");
 
   return (
-    <RulesExperience
-      copy={copy}
-      documents={documents}
-      latestDocumentDate={legalCorpus.effectiveDateDisplay}
-      locale={locale}
-    />
+    <>
+      <RulesExperience
+        copy={copy}
+        documents={documents}
+        latestDocumentDate={legalCorpus.effectiveDateDisplay}
+        locale={locale}
+      />
+      <StagingProfilePolicyReviewLink />
+    </>
   );
 }
