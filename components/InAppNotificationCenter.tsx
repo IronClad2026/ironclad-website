@@ -542,6 +542,8 @@ export default function InAppNotificationCenter({
     );
   }
 
+  const inboxAction = playerExpanded ? "Close inbox" : "Open inbox";
+  const inboxSummary = t("center.totalSummary", { total: displayTotalCount, unread: displayUnreadCount });
   return (
     <section
       className={`overflow-hidden border ${dashboardPresentation ? "border-white/12 bg-zinc-950/75" : "rounded-3xl border-orange-500/20 bg-[linear-gradient(135deg,rgba(249,115,22,0.08),rgba(255,255,255,0.035))] shadow-xl shadow-black/20 backdrop-blur"} ${className}`}
@@ -552,12 +554,12 @@ export default function InAppNotificationCenter({
           <button
             type="button"
             aria-expanded={playerExpanded}
+            aria-label={`${title} ${inboxSummary} · ${inboxAction}`}
             onClick={() => setPlayerExpanded((current) => !current)}
             className="inline-flex min-h-11 items-center gap-1 rounded-sm text-xs font-semibold text-orange-200 hover:text-white focus-visible:outline-2 focus-visible:outline-orange-300"
           >
-            {playerExpanded ? "Close inbox" : "Open inbox"}
+            {inboxAction}
             <ChevronRight aria-hidden size={15} />
-            <span className="sr-only">{t("center.totalSummary", { total: displayTotalCount, unread: displayUnreadCount })}</span>
           </button>
         </div>
       ) : <button
@@ -573,10 +575,7 @@ export default function InAppNotificationCenter({
           <span className="min-w-0">
             <span className="block text-xl font-bold text-white">{title}</span>
             <span className="mt-1 block text-xs font-semibold text-zinc-400">
-              {t("center.totalSummary", {
-                total: displayTotalCount,
-                unread: displayUnreadCount,
-              })}
+              {inboxSummary}
             </span>
           </span>
         </span>

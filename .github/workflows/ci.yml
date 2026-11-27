@@ -237,7 +237,25 @@ jobs:
         run: node scripts/legal-successor/rehearse-p03-privacy.mjs /usr/lib/postgresql/17/bin/psql
       - name: Announcement rich-document persistence and permissions
         run: node scripts/announcements/database.mjs /usr/lib/postgresql/17/bin/psql
-      - name: Rehearse the exact combined Production upgrade on a separate disposable cluster
+      - name: Build the combined recovery application with isolated fixture configuration
+        if: ${{ !cancelled() && github.ref == 'refs/heads/codex/ironclad-combined-release' }}
+        env:
+          NEXT_TELEMETRY_DISABLED: '1'
+          NEXT_PUBLIC_CLERK_TELEMETRY_DISABLED: '1'
+          CLERK_API_URL: http://127.0.0.1:56977
+          CLERK_SECRET_KEY: sk_test_not-a-real-secret
+          NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:56977
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: test-only-publishable-key
+          SUPABASE_SERVICE_ROLE_KEY: test-only-service-role-key
+          TRANSACTIONAL_EMAIL_MODE: disabled
+          CASTER_PROGRAM_ENABLED: 'false'
+          READY_PROGRAM_ENABLED: 'false'
+          PATCH2_PUBLIC_PROFILE_NOTICE_ENABLED: 'true'
+        run: |
+          npm ci
+          export NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="$(node -p '"pk_live_" + Buffer.from("clerk.recovery-fixture.invalid$").toString("base64")')"
+          npm run build
+      - name: Rehearse the exact combined Production upgrade and recovery on a separate disposable cluster
         if: ${{ !cancelled() && github.ref == 'refs/heads/codex/ironclad-combined-release' }}
         env:
           P03_PG_PORT: '56624'
@@ -245,6 +263,11 @@ jobs:
           set -euo pipefail
           pg_bin=/usr/lib/postgresql/17/bin
           pg_dir="$RUNNER_TEMP/combined-postgres"
+          rest_archive="$RUNNER_TEMP/postgrest-v16.5-linux-static-x86-64.tar.xz"
+          curl --fail --silent --show-error --location --retry 2 -o "$rest_archive" https://github.com/PostgREST/postgrest/releases/download/v16.5/postgrest-v16.5-linux-static-x86-64.tar.xz
+          printf '%s  %s\n' '5099e7ada38f9f6846cd87c14c5f158b7c165f1e9959665ad412e61f4dceba95' "$rest_archive" | sha256sum --check
+          tar -xJf "$rest_archive" -C "$RUNNER_TEMP" postgrest
+          export COMBINED_RECOVERY_POSTGREST="$RUNNER_TEMP/postgrest"
           "$pg_bin/initdb" -D "$pg_dir" -U postgres -A trust --no-locale --encoding=UTF8
           trap '"$pg_bin/pg_ctl" -D "$pg_dir" -m fast -w stop' EXIT
           "$pg_bin/pg_ctl" -D "$pg_dir" -l "$RUNNER_TEMP/combined-postgres.log" -o "-h 127.0.0.1 -p 56624 -k $RUNNER_TEMP" -w start

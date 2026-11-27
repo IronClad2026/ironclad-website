@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createHmac, randomBytes } from "node:crypto";
+import { existsSync } from "node:fs";
 import { isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
@@ -18,7 +19,8 @@ function signed(role, key) {
 
 async function reachable(label, url, child, headers) {
   let lastStatus;
-  for (let attempt=0; attempt<70; attempt+=1) {
+  const deadline = Date.now() + 65000;
+  while (Date.now() < deadline) {
     if (child.exitCode!==null) throw new Error(`Disposable ${label} exited ${child.exitCode}`);
     const response=await fetch(url,{headers,signal:AbortSignal.timeout(2500),redirect:"manual"}).catch(()=>null);
     if (response && response.status<500) return response;
@@ -33,12 +35,13 @@ export async function checkRecoveryBuild({root,database,port,binary}) {
   assert.match(database,/^p03_combined_upgrade_\d+$/);
   assert.equal(port,56624);
   assert(isAbsolute(binary)&&/[/\\]postgrest(?:\.exe)?$/i.test(binary));
+  assert(existsSync(new URL(".next/BUILD_ID", root)), "Build the candidate locally with the disposable recovery settings first");
   const key=randomBytes(36).toString("hex");
   const service=signed("service_role",key);
   const anon=signed("anon",key);
   let rest,site;
   try {
-    rest=spawn(binary,[],{cwd:root,env:{...system,
+    rest=spawn(binary,["+RTS","-N2","-RTS"],{cwd:root,env:{...system,
       PGRST_SERVER_HOST:"127.0.0.1",PGRST_SERVER_PORT:"56977",
       PGRST_DB_URI:`postgresql://postgres@127.0.0.1:${port}/${database}`,PGRST_DB_SCHEMAS:"public",
       PGRST_DB_ANON_ROLE:"anon",PGRST_DB_PRE_REQUEST:"public.require_public_gaming_profile_notice_for_api",PGRST_JWT_SECRET:key,
@@ -50,9 +53,10 @@ export async function checkRecoveryBuild({root,database,port,binary}) {
 
     // Local providers and flags only. The production opt-in probe never runs.
     site=spawn(process.execPath,[fileURLToPath(new URL("node_modules/next/dist/bin/next",root)),
-      "dev","--webpack","--hostname","127.0.0.1","--port","4312"],{cwd:root,env:{...system,
+      "start","--hostname","127.0.0.1","--port","4312"],{cwd:root,env:{...system,
       NEXT_TELEMETRY_DISABLED:"1",NEXT_PUBLIC_SUPABASE_URL:dbOrigin,NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:anon,
-      SUPABASE_SERVICE_ROLE_KEY:service,NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:"pk_test_Y2xlcmsudGVzdCQ=",
+      SUPABASE_SERVICE_ROLE_KEY:service,CLERK_API_URL:dbOrigin,NEXT_PUBLIC_CLERK_TELEMETRY_DISABLED:"1",
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:"pk_live_"+Buffer.from("clerk.recovery-fixture.invalid$").toString("base64"),
       CLERK_SECRET_KEY:"sk_test_not-a-real-secret",TRANSACTIONAL_EMAIL_MODE:"disabled",
       CASTER_PROGRAM_ENABLED:"false",READY_PROGRAM_ENABLED:"false",PATCH2_PUBLIC_PROFILE_NOTICE_ENABLED:"true",
     },stdio:"ignore",windowsHide:true});

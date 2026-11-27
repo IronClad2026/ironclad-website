@@ -38,7 +38,6 @@ export default function OperationsLiveOverview({ metrics, navigation }: { metric
         </div>
       </header>
       {navigation}
-      <p className="mb-4 text-sm text-zinc-400">The assistance metric below covers earlier shared-room and legacy requests. <Link href="/admin/tournaments" className="inline-flex min-h-11 items-center text-orange-200 underline">Open a tournament&apos;s Assistance section for private conversations.</Link></p>
       <section id="operations-overview" aria-labelledby="operations-overview-title" className="scroll-mt-32">
         <h2 id="operations-overview-title" className="mb-3 text-sm font-semibold text-zinc-300">Current operations <span className="font-normal text-zinc-400">· Now</span></h2>
         <div className="grid grid-cols-2 gap-2 lg:grid-cols-5">
@@ -54,6 +53,7 @@ export default function OperationsLiveOverview({ metrics, navigation }: { metric
           <h2 id="attention-required-title" className="text-xl font-bold">Attention Required</h2>
           <span className="text-xs text-zinc-400">Current recorded queues</span>
         </div>
+        <p className="mb-4 text-sm text-zinc-400">The assistance metric below covers earlier shared-room and legacy requests. <Link href="/admin/tournaments" className="inline-flex min-h-11 items-center text-orange-200 underline">Open a tournament&apos;s Assistance section for private conversations.</Link></p>
         <div id="match-issues" className="grid scroll-mt-32 items-start gap-2 xl:grid-cols-2">
           {active.length === 0 ? <p className="rounded-xl border border-white/10 bg-zinc-950 p-4 text-sm text-zinc-300">No items in these operational queues. Registration decisions are shown separately above.</p> : active.map((item) => (
             <div key={item.key} className={"rounded-xl border px-3 py-2 " + tones[item.tone].style}>
