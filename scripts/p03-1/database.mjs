@@ -3,7 +3,10 @@
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { localClient, localPsqlArgument, matchRoomFixtureFlag, matchRoomFixtureStaff } from "./local-pg.mjs";
+import {
+  currentMatchRoomFixture, currentMatchRoomFixtureStaff,
+  localClient, localPsqlArgument, matchRoomFixtureFlag, matchRoomFixtureStaff,
+} from "./local-pg.mjs";
 
 const root = process.cwd();
 const stamp = Date.now();
@@ -34,7 +37,7 @@ assert(legacyMigrationCount > 0, "Pinned pre-Patch-2 Match Room migration was fo
 console.log("PASS full staging migration replay: " + migrations.length);
 await legacy.run(matchRoomFixtureFlag(true));
 await client.run(matchRoomFixtureStaff);
-await client.run(matchRoomFixtureFlag(true));
+await client.run(matchRoomFixtureFlag(true, currentMatchRoomFixtureStaff));
 const fixture = read("tests/database/match-room-phase-1.sql");
 const prefix = fixture.slice(fixture.indexOf("begin;"), fixture.indexOf("-- Physical boundary:"));
 const suites = [];
@@ -56,7 +59,8 @@ for (const name of ["match-room-retention", "match-room-realtime"]) {
   console.log("PASS legacy " + name + ": " + result.passed);
 }
 for (const name of ["match-room-current-security", "announcement-rich-documents"]) {
-  const output = await client.run((name === "match-room-current-security" ? prefix : "") + read("tests/database/" + name + ".sql"));
+  const sql = read("tests/database/" + name + ".sql");
+  const output = await client.run(name === "match-room-current-security" ? currentMatchRoomFixture(prefix) + sql : sql);
   const result = output.split(/\r?\n/).findLast((line) => line.startsWith('{"suite"'));
   suites.push(result ? JSON.parse(result) : { suite: name, status: "PASS" });
   console.log("PASS full-head " + name);

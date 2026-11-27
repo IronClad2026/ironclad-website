@@ -19,12 +19,16 @@ export function localPort() {
   return port;
 }
 
-export function matchRoomFixtureFlag(enabled) {
+const legacyFixtureStaff = "match-room-test-4";
+export const currentMatchRoomFixtureStaff = "user_MatchRoomFixture4";
+
+export function matchRoomFixtureFlag(enabled, actor = legacyFixtureStaff) {
   assert.equal(typeof enabled, "boolean");
+  assert([legacyFixtureStaff, currentMatchRoomFixtureStaff].includes(actor));
   return `
     set role service_role;
-    set request.jwt.claims = '{"role":"service_role","sub":"match-room-test-4"}';
-    select public.set_match_room_enabled(${enabled},'match-room-test-4');
+    set request.jwt.claims = '{"role":"service_role","sub":"${actor}"}';
+    select public.set_match_room_enabled(${enabled},'${actor}');
     reset request.jwt.claims;
     reset role;
   `;
@@ -34,9 +38,10 @@ export function matchRoomFixtureFlag(enabled) {
 // and role grants are asserted by the SQL suites, independently of this data.
 export const matchRoomFixtureStaff = `
   insert into ironclad_private.patch2_staff_authorizations (subject_digest, verification_reference)
-  select sha256(convert_to(actor,'UTF8')), 'Disposable CI Match Room fixture'
-  from (values ('match-room-test-1'),('match-room-test-4')) identities(actor);
+  values (sha256(convert_to('${currentMatchRoomFixtureStaff}','UTF8')), 'Disposable CI Match Room fixture');
 `;
+
+export const currentMatchRoomFixture = (sql) => sql.replaceAll("match-room-test-", "user_MatchRoomFixture");
 
 export function localClient(psql, { port = localPort(), database = "p03_rehearsal" } = {}) {
   assert(psql && Number.isInteger(port) && port > 1024 && port < 65536);

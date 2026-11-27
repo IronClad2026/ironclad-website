@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { readFileSync, mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { localClient, localPsqlArgument } from "../p03-1/local-pg.mjs";
+import { currentMatchRoomFixture, localClient, localPsqlArgument } from "../p03-1/local-pg.mjs";
 
 const root = process.cwd();
 const stamp = Date.now();
@@ -46,7 +46,7 @@ for (const division of ["academy", "pro"]) {
     console.log(`PASS ${division}: ${name}${evidence.passed ? ": " + evidence.passed : ""}`);
   }
   const currentFixture = futureFixture(read("tests/database/match-room-current-security.sql"), division);
-  const currentOutput = await client.run(prefix + currentFixture);
+  const currentOutput = await client.run(currentMatchRoomFixture(prefix) + currentFixture);
   const currentResult = currentOutput.split(/\r?\n/).findLast((line) => line.startsWith('{"suite"'));
   assert(currentResult, "Current Match Room security emits executable evidence");
   suites.push({ division, ...JSON.parse(currentResult) });
