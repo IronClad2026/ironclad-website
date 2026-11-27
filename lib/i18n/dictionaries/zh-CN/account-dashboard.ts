@@ -3,7 +3,7 @@ import type { AccountDashboardDictionary } from "@/lib/i18n/dictionaries/en/acco
 const dictionary = {
   showcase: {
     highlightProviderProcessing: "Cloudflare Workers 检查上传权限，并将视频片段和预览图片存储在私有 R2 存储空间中。Cloudflare 还会接收网络和请求元数据。",
-    highlightProviderVisibility: "你的资料公开时，访客可以播放符合条件的视频片段。资料可见性限制和片段审核结果同样适用于播放。",
+    highlightProviderVisibility: "活跃玩家资料中符合条件的视频片段会公开。已隐藏的片段和已关闭账户的片段无法公开播放。",
     highlightProviderDeletion: "移除视频片段或关闭账户会立即隐藏视频片段。存储清理会异步执行。",
     highlightProviderPrivacy: "Cloudflare 隐私政策",
     highlightProviderOpensNewTab: "在新标签页中打开",
@@ -12,11 +12,11 @@ const dictionary = {
     latestEmpty: "尚未保存想法。",
     conflictResolved: "已加载最新保存版本，并保留你尚未保存的想法。请检查后再保存。",
     title: "玩家展示",
-    description: "为你的展示区选择一条当前想法和一项已获得的成就。",
+    description: "用当前想法和一项已获得的成就，让你的公开资料更有个人风格。",
     manage: "管理展示",
     backToDashboard: "返回玩家面板",
     publicProfile: "公开资料",
-    publicVisibilityHelp: "你的资料公开时，访客可以看到你的精选成就，以及处于可见状态的当前想法。",
+    publicVisibilityHelp: "你的当前想法和精选成就会显示在公开资料中。",
     viewPublicProfile: "查看公开资料",
     thoughtTitle: "当前想法",
     thoughtHelp: "最多 160 个纯文本字符，可使用表情符号。组合表情可能计为多个字符。",

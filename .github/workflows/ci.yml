@@ -37,6 +37,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
+        id: dependencies
         run: npm ci
 
       - name: Consolidated release source and environment boundaries
@@ -52,18 +53,24 @@ jobs:
         run: npm run test
 
       - name: Install browser test runtime
+        id: browser-runtime
+        if: ${{ !cancelled() && steps.dependencies.outcome == 'success' }}
         run: npx playwright install --with-deps chromium
 
       - name: Match result and replay browser regression tests
+        if: ${{ !cancelled() && steps.browser-runtime.outcome == 'success' }}
         run: npx playwright test --config tests/browser/match-result/playwright.config.ts
 
       - name: Bracket geometry and private unread attention browser tests
+        if: ${{ !cancelled() && steps.browser-runtime.outcome == 'success' }}
         run: npx playwright test --config tests/browser/bracket-layout/playwright.config.ts
 
       - name: Match Room browser regression tests
+        if: ${{ !cancelled() && steps.browser-runtime.outcome == 'success' }}
         run: npx playwright test --config tests/browser/match-room/playwright.config.ts
 
       - name: Build
+        if: ${{ !cancelled() && steps.dependencies.outcome == 'success' }}
         run: npm run build
 
   browser:
@@ -88,24 +95,33 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Install browser test runtime
+        id: browser-runtime
         run: npx playwright install --with-deps chromium
       - name: Showcase browser regression tests (synthetic local actions)
+        if: ${{ !cancelled() && steps.browser-runtime.outcome == 'success' }}
         run: npx playwright test --config tests/browser/showcase/playwright.config.ts
       - name: Highlights browser regression tests (synthetic local media)
+        if: ${{ !cancelled() && steps.browser-runtime.outcome == 'success' }}
         run: npx playwright test --config tests/browser/combat-highlights/playwright.config.ts
       - name: Official News and navigation browser regression tests
+        if: ${{ !cancelled() && steps.browser-runtime.outcome == 'success' }}
         run: npx playwright test --config tests/browser/news/playwright.config.ts
       - name: Announcement editor desktop and mobile regressions
+        if: ${{ !cancelled() && steps.browser-runtime.outcome == 'success' }}
         run: npx playwright test --config tests/browser/announcements/playwright.config.ts
       - name: Responsive public presentation regressions
+        if: ${{ !cancelled() && steps.browser-runtime.outcome == 'success' }}
         run: npx playwright test --config tests/browser/ui-redesign/playwright.config.ts
       - name: Dashboard and career browser regressions
+        if: ${{ !cancelled() && steps.browser-runtime.outcome == 'success' }}
         env:
           UI_REDESIGN_SURFACE: dashboard
         run: npx playwright test --config tests/browser/ui-redesign/playwright.config.ts
       - name: Admin match workspace regressions
+        if: ${{ !cancelled() && steps.browser-runtime.outcome == 'success' }}
         run: npx playwright test --config tests/browser/admin-match/playwright.config.ts
       - name: Admin operations regressions
+        if: ${{ !cancelled() && steps.browser-runtime.outcome == 'success' }}
         run: npx playwright test --config tests/browser/admin-operations/playwright.config.ts
       - name: Save failed synthetic browser traces
         if: failure()
@@ -180,6 +196,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
       - name: Use Node.js 22.12.0
         uses: actions/setup-node@v4
         with:
@@ -220,6 +237,26 @@ jobs:
         run: node scripts/legal-successor/rehearse-p03-privacy.mjs /usr/lib/postgresql/17/bin/psql
       - name: Announcement rich-document persistence and permissions
         run: node scripts/announcements/database.mjs /usr/lib/postgresql/17/bin/psql
+      - name: Rehearse the exact combined Production upgrade on a separate disposable cluster
+        if: ${{ !cancelled() && github.ref == 'refs/heads/codex/ironclad-combined-release' }}
+        env:
+          P03_PG_PORT: '56624'
+        run: |
+          set -euo pipefail
+          pg_bin=/usr/lib/postgresql/17/bin
+          pg_dir="$RUNNER_TEMP/combined-postgres"
+          "$pg_bin/initdb" -D "$pg_dir" -U postgres -A trust --no-locale --encoding=UTF8
+          trap '"$pg_bin/pg_ctl" -D "$pg_dir" -m fast -w stop' EXIT
+          "$pg_bin/pg_ctl" -D "$pg_dir" -l "$RUNNER_TEMP/combined-postgres.log" -o "-h 127.0.0.1 -p 56624 -k $RUNNER_TEMP" -w start
+          node scripts/combined-release/database.mjs "$pg_bin/psql"
+      - name: Save combined upgrade and permission evidence
+        if: ${{ !cancelled() && github.ref == 'refs/heads/codex/ironclad-combined-release' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: combined-production-equivalent-evidence
+          path: test-results/combined-production-equivalent-result.json
+          if-no-files-found: error
+          retention-days: 14
       - name: Stop disposable PostgreSQL
         if: always()
         run: |

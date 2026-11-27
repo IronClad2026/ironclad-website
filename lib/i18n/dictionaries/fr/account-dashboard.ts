@@ -3,7 +3,7 @@ import type { AccountDashboardDictionary } from "@/lib/i18n/dictionaries/en/acco
 const dictionary = {
   showcase: {
     highlightProviderProcessing: "Cloudflare Workers vérifie l’accès aux téléversements et stocke les clips et les images d’aperçu dans un espace R2 privé. Cloudflare reçoit aussi les métadonnées du réseau et des requêtes.",
-    highlightProviderVisibility: "Les visiteurs peuvent lire les clips admissibles tant que votre profil est public. Les restrictions du profil et la modération des clips s’appliquent aussi à la lecture.",
+    highlightProviderVisibility: "Les clips admissibles des profils de joueurs actifs sont publics. Les clips masqués et ceux des comptes fermés ne peuvent pas être lus publiquement.",
     highlightProviderDeletion: "Supprimer un clip ou fermer votre compte le masque immédiatement. Le nettoyage du stockage s’effectue de manière asynchrone.",
     highlightProviderPrivacy: "Politique de confidentialité de Cloudflare",
     highlightProviderOpensNewTab: "S’ouvre dans un nouvel onglet",
@@ -12,11 +12,11 @@ const dictionary = {
     latestEmpty: "Aucune pensée enregistrée.",
     conflictResolved: "La dernière version enregistrée a été chargée. Votre pensée non enregistrée a été conservée. Vérifiez-la avant de l’enregistrer.",
     title: "Présentation du joueur",
-    description: "Choisissez une pensée du moment et un succès obtenu pour votre vitrine.",
+    description: "Personnalisez votre profil public avec une pensée du moment et un succès obtenu.",
     manage: "Gérer la présentation",
     backToDashboard: "Retour au tableau de bord",
     publicProfile: "Profil public",
-    publicVisibilityHelp: "Lorsque votre profil est public, les visiteurs peuvent voir votre succès à la une et votre pensée du moment si elle est visible.",
+    publicVisibilityHelp: "Votre pensée du moment et votre succès à la une apparaissent sur votre profil public.",
     viewPublicProfile: "Voir le profil public",
     thoughtTitle: "Pensée du moment",
     thoughtHelp: "160 caractères de texte brut maximum. Les emojis sont autorisés ; les emojis combinés peuvent compter pour plusieurs caractères.",

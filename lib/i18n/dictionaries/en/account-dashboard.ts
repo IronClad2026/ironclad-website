@@ -3,7 +3,7 @@ import type { DictionaryShape } from "@/lib/i18n/types";
 const dictionary = {
   showcase: {
     highlightProviderProcessing: "Cloudflare Workers checks upload access and stores clips and preview images in private R2 storage. Cloudflare also receives network and request metadata.",
-    highlightProviderVisibility: "Visitors can play eligible clips while your profile is public. Profile restrictions and clip moderation also apply to playback.",
+    highlightProviderVisibility: "Eligible clips on active player profiles are public. Hidden clips and clips from closed accounts are not publicly playable.",
     highlightProviderDeletion: "Removing a clip or closing your account hides it immediately. Storage cleanup runs asynchronously.",
     highlightProviderPrivacy: "Cloudflare privacy policy",
     highlightProviderOpensNewTab: "Opens in a new tab",
@@ -12,11 +12,11 @@ const dictionary = {
     latestEmpty: "No thought saved.",
     conflictResolved: "Latest saved version loaded. Your unsaved thought has been kept. Review it before saving.",
     title: "Player Showcase",
-    description: "Choose a Current Thought and one earned achievement for your Showcase.",
+    description: "Make your public profile your own with a Current Thought and one earned achievement.",
     manage: "Manage Showcase",
     backToDashboard: "Back to Dashboard",
     publicProfile: "Public profile",
-    publicVisibilityHelp: "When your profile is public, visitors can see your featured achievement and any Current Thought that is visible.",
+    publicVisibilityHelp: "Your Current Thought and featured achievement appear on your public profile.",
     viewPublicProfile: "View Public Profile",
     thoughtTitle: "Current Thought",
     thoughtHelp: "Up to 160 characters of plain text. Emoji are welcome; combined emoji may count as several characters.",
