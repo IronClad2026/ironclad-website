@@ -428,9 +428,11 @@ describe("Match Room", () => {
     initialIntersection = false;
     renderRoom();
     await ready();
+    const log = screen.getByRole("log");
+    await waitFor(() => expect(observedTails.get(log.querySelector("[data-match-room-tail]")!)).toBeTypeOf("function"));
     if (state === "hidden") Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
     else Object.defineProperty(navigator, "onLine", { configurable: true, value: false });
-    await act(async () => { setTailVisible(screen.getByRole("log"), true); });
+    await act(async () => { setTailVisible(log, true); });
     expect(actions.markMatchRoomRead).not.toHaveBeenCalled();
     Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
     Object.defineProperty(navigator, "onLine", { configurable: true, value: true });
