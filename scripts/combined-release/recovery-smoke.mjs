@@ -12,6 +12,7 @@ import { setTimeout as delay } from "node:timers/promises";
 const dbOrigin = "http://127.0.0.1:56977";
 const siteOrigin = "http://localhost:4312";
 const restPort = 56978;
+const publicBuildKey = "test-only-publishable-key";
 const system = Object.fromEntries(Object.entries(process.env).filter(([key]) =>
   /^(?:PATH|SystemRoot|windir|PATHEXT|USERPROFILE|LOCALAPPDATA|APPDATA|TEMP|TMP|COMSPEC|SystemDrive|HOMEPATH|HOMEDRIVE|OS|NUMBER_OF_PROCESSORS|PROCESSOR_ARCHITECTURE|PROGRAMDATA|ALLUSERSPROFILE|PUBLIC|PROGRAMFILES(?:\(X86\))?|COMMONPROGRAMFILES(?:\(X86\))?|LANG|LC_ALL|PGCLIENTENCODING)$/i.test(key)));
 
@@ -35,7 +36,7 @@ async function reachable(label, url, child, headers) {
   throw new Error(`Disposable ${label} did not become ready${lastStatus ? ` (last HTTP ${lastStatus})` : ""}`);
 }
 
-async function startLocalGateway() {
+async function startLocalGateway(anonymousToken) {
   const prefix = "/rest/v1";
   const gateway = createServer((incoming, outgoing) => {
     const url = new URL(incoming.url, dbOrigin);
@@ -43,8 +44,14 @@ async function startLocalGateway() {
       outgoing.writeHead(404).end();
       return;
     }
+    const headers = { ...incoming.headers };
+    // Resolve the compiled publishable fixture key to the anonymous database role.
+    // Other requests retain their original authorization and undergo normal PostgREST checks.
+    if (headers.apikey === publicBuildKey && headers.authorization === `Bearer ${publicBuildKey}`) {
+      headers.authorization = `Bearer ${anonymousToken}`;
+    }
     const upstream = request({ host: "127.0.0.1", port: restPort, method: incoming.method,
-      path: url.pathname.slice(prefix.length) + url.search, headers: incoming.headers }, (response) => {
+      path: url.pathname.slice(prefix.length) + url.search, headers }, (response) => {
       outgoing.writeHead(response.statusCode, response.headers);
       response.pipe(outgoing);
     });
@@ -76,7 +83,7 @@ export async function checkRecoveryBuild({root,database,port,binary}) {
     },stdio:"ignore",windowsHide:true});
     rest.on("error",()=>{});
     // Supabase clients use /rest/v1. Bare PostgREST mounts the same requests at /.
-    gateway = await startLocalGateway();
+    gateway = await startLocalGateway(anon);
     const sample=await reachable("PostgREST",dbOrigin+"/rest/v1/tournaments?select=title&slug=eq.caster-coverage-test",rest,{Authorization:`Bearer ${service}`});
     assert.equal(sample.status,200);
     assert.deepEqual(await sample.json(),[{title:"Caster Coverage Test"}]);
