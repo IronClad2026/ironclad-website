@@ -50,7 +50,6 @@ function AssignmentItem({ assignment, choices, scoped }: {
   scoped: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const [notice, setNotice] = useState("");
   const canManage = scoped || assignment.tournament_available === false;
   const changeable = assignment.status === "scheduled" || assignment.status === "completed";
   return (
@@ -86,24 +85,22 @@ function AssignmentItem({ assignment, choices, scoped }: {
           <Link className="inline-flex min-h-11 items-center underline" prefetch={false} href={coverageWorkspaceHref(assignment.tournament_id)}>Open Tournament Casting</Link>
         )}
       </div>
-      {notice && <p role="status" className="text-sm font-bold text-orange-200">{notice}</p>}
       <details className="border-t border-white/10 pt-2" onToggle={(event) => setExpanded(event.currentTarget.open)}>
         <summary className="min-h-11 cursor-pointer py-2 font-bold text-orange-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300">
           {canManage && changeable ? "Manage assignment and view history" : "View assignment history"}
         </summary>
         {expanded && <div className="space-y-4">
-          {canManage && changeable && <AssignmentMutation key={assignment.version} assignment={assignment} choices={choices} setNotice={setNotice} />}
-          <AssignmentHistory key={assignment.version} assignment={assignment.id} />
+          {canManage && changeable && <AssignmentMutation key={`mutation-${assignment.version}`} assignment={assignment} choices={choices} />}
+          <AssignmentHistory key={`history-${assignment.version}`} assignment={assignment.id} />
         </div>}
       </details>
     </>
   );
 }
 
-function AssignmentMutation({ assignment, choices, setNotice }: {
+function AssignmentMutation({ assignment, choices }: {
   assignment: AdminCoverageAssignment;
   choices: CoverageChoices | null;
-  setNotice: (message: string) => void;
 }) {
   const options: CoverageMutation[] = assignment.status === "completed"
     ? ["correct", "cancel", "unfulfilled"]
@@ -119,12 +116,7 @@ function AssignmentMutation({ assignment, choices, setNotice }: {
   const [reason, setReason] = useState("");
   const [acknowledgement, setAcknowledgement] = useState(false);
   const [confirm, setConfirm] = useState(false);
-  const [result, submit, pending] = useActionState(async (previous: CoverageMutationResult, data: FormData) => {
-    setNotice("");
-    const next = await saveCastingAssignment(previous, data);
-    if (next.kind === "ok") setNotice(next.message ?? "");
-    return next;
-  }, { kind: "idle" });
+  const [result, submit, pending] = useActionState<CoverageMutationResult, FormData>(saveCastingAssignment, { kind: "idle" });
   const editLinks = action === "update" || action === "complete" || action === "correct";
   const ownMatch = (action === "update" || action === "complete") && !assignment.own_match_reason &&
     (assignment.conflict === "own_match" || result.code === "own_match_ack_required");
@@ -159,7 +151,7 @@ function AssignmentMutation({ assignment, choices, setNotice }: {
           checked={confirm} onChange={(event) => setConfirm(event.target.checked)} />
         {action === "complete" ? "I confirm this caster completed coverage at the recorded scope." : "I confirm this assignment decision."}
       </label>
-      {result.kind === "error" && result.message && <p role="alert" className="text-sm text-orange-200">{result.message}</p>}
+      {result.message && <p role={result.kind === "error" ? "alert" : "status"} className="text-sm text-orange-200">{result.message}</p>}
       <button className={casterAdminPrimary} disabled={pending || !confirm}>
         {pending ? "Saving…" : coverageActionLabels[action]}
       </button>
