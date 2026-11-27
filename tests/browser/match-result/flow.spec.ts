@@ -54,11 +54,19 @@ for (const width of [360, 390, 412, 430, 1280])
     await expect(page.locator('input[type="file"]')).toHaveCount(0);
     await expect(page.getByText(/opponent has 30 minutes/)).toBeVisible();
     await expect(page.getByText(/remaining$/)).toBeVisible();
-    const assistance = page.getByRole("button", { name: "Request Admin Assistance" });
+    await expect(page.getByRole("button", { name: "Request Admin Assistance", exact: true })).toHaveCount(0);
+    const assistance = page.getByRole("button", { name: "Message IronClad admins", exact: true });
     await expect(assistance).toBeVisible();
     await assistance.click();
-    await expect(page.getByText("Assistance requested", { exact: true })).toBeVisible();
-    await expect(assistance).toHaveCount(0);
+    const sendRequest = page.getByRole("button", { name: "Send private request", exact: true });
+    await expect(sendRequest).toBeDisabled();
+    const issue = "The opponent has a question about the replay.";
+    await page.getByRole("textbox", { name: "Explain the issue" }).fill(issue);
+    await expect(sendRequest).toBeEnabled();
+    await sendRequest.click();
+    await expect(page.getByText("Your private assistance request was sent.", { exact: true })).toBeVisible();
+    await expect(page.getByText(issue, { exact: true })).toBeVisible();
+    await expect(sendRequest).toHaveCount(0);
     await page.screenshot({
       path: testInfo.outputPath("waiting-" + width + ".png"),
       fullPage: true,
