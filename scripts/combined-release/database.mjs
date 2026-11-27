@@ -80,6 +80,18 @@ async function seedLegacyVerifiedCoverage() {
 
 async function addPopulatedRecoveryMedia() {
   const { tournamentId, legacyTitle, casterTitle, casterUrl } = recoveryMediaFixture;
+  // The detach regression intentionally deletes the prior generated tree.
+  // Recover with a new synthetic tree because launched divisions must have one.
+  await run(`begin;
+    insert into public.generated_brackets(id,tournament_bracket_id,format,participant_count,slot_count,generated_by)
+      values('ca570004-0000-4000-8000-000000000081','ca570004-0000-4000-8000-000000000011',
+        'single_elimination',2,2,'user_CasterPhase3Staff');
+    insert into public.bracket_rounds(id,generated_bracket_id,round_number,name)
+      values('ca570004-0000-4000-8000-000000000082','ca570004-0000-4000-8000-000000000081',1,'Recovery Final');
+    insert into public.tournament_matches(id,generated_bracket_id,round_id,match_number,status,series_best_of)
+      values('ca570004-0000-4000-8000-000000000083','ca570004-0000-4000-8000-000000000081',
+        'ca570004-0000-4000-8000-000000000082',1,'scheduled',3);
+    commit;`);
   await service(`insert into public.tournament_media(tournament_id,title,url,media_type,published)
     values(${literal(tournamentId)},${literal(legacyTitle)},'https://www.twitch.tv/videos/83820','video',true);`);
   const casterId = await service(`select public.caster_media_save('user_CasterPhase3Other',null,null,${literal(tournamentId)},null,null,
