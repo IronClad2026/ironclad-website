@@ -28,7 +28,14 @@ describe("Admin Tournament Media workspace contract", () => {
       '{ icon: Clapperboard, label: "Media", section: "media" }'
     );
     expect(menu).toContain("?section=${item.section}");
-    expect(menu).toContain("2xl:grid-cols-10");
+    const [drawer, desktop] = menu.split("export function TournamentDesktopSectionNavigation");
+    expect(drawer).toContain("xl:hidden");
+    expect(drawer).toContain("w-[min(22rem,100vw)] overflow-y-auto");
+    expect(drawer).toContain("TOURNAMENT_MANAGEMENT_SECTIONS.filter");
+    expect(desktop).toContain("TOURNAMENT_MANAGEMENT_SECTIONS.filter");
+    expect(desktop).toContain("xl:block");
+    expect(desktop).toContain("grid-cols-3 gap-1.5 2xl:grid-cols-6");
+    expect(desktop).toContain("min-w-0 break-words");
     expect(header).toContain('media: "Media"');
   });
 

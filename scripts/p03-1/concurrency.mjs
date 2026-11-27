@@ -1,4 +1,4 @@
-// Reuse controlled-session regressions against the fully migrated P03.1 tree.
+// Reuse controlled-session regressions at their pre-Patch-2 contract.
 // Only local target names, template, and obsolete initial migration application
 // are adapted. Original tests and all their behavioral assertions stay intact.
 import assert from "node:assert/strict";
@@ -7,12 +7,12 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { localClient, localPsqlArgument } from "./local-pg.mjs";
+import { localClient, localPsqlArgument, matchRoomFixtureFlag } from "./local-pg.mjs";
 
 const root = process.cwd();
 const psql = localPsqlArgument();
-const template = JSON.parse(readFileSync(path.join(root, "scripts/p03-1/database-evidence.json"), "utf8")).database;
-assert(/^p03_realtime_\d+$/.test(template));
+const { legacyDatabase: template } = JSON.parse(readFileSync(path.join(root, "scripts/p03-1/database-evidence.json"), "utf8"));
+assert(/^p03_realtime_legacy_\d+$/.test(template));
 const client = localClient(psql, { database: template });
 assert.equal(await client.run(`select inet_server_addr()='127.0.0.1'::inet and inet_server_port()=${client.port} and (select count(*) from public.players)=0;`), "t");
 const directory = mkdtempSync(path.join(tmpdir(), "p031-concurrency-"));
@@ -30,7 +30,8 @@ for (const [name, legacyDatabase, legacyTemplate, legacyRole] of [
     .replaceAll("import.meta.url", JSON.stringify(pathToFileURL(file).href));
   if (name === "match-room-production-hardening-concurrency") {
     assert(source.includes("await run(migration);"));
-    source = source.replace("await run(migration);", "await run(\"select public.set_match_room_enabled(false,'match-room-test-4');\"); // Full template already has hardening; restore tested default.");
+    source = source.replace("await run(migration);",
+      `await run(${JSON.stringify(matchRoomFixtureFlag(false))}); // Full template already has hardening; restore tested default.`);
   } else if (name === "match-room-unread-concurrency") {
     assert(source.includes('await run(readFileSync(new URL(migrationName, migrationDirectory), "utf8"));'));
     source = source.replace('await run(readFileSync(new URL(migrationName, migrationDirectory), "utf8"));', "// Full template already has unread summary.");

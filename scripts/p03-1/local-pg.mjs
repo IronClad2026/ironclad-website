@@ -19,6 +19,25 @@ export function localPort() {
   return port;
 }
 
+export function matchRoomFixtureFlag(enabled) {
+  assert.equal(typeof enabled, "boolean");
+  return `
+    set role service_role;
+    set request.jwt.claims = '{"role":"service_role","sub":"match-room-test-4"}';
+    select public.set_match_room_enabled(${enabled},'match-room-test-4');
+    reset request.jwt.claims;
+    reset role;
+  `;
+}
+
+// Synthetic actors for the disposable replay only. Production permissions
+// and role grants are asserted by the SQL suites, independently of this data.
+export const matchRoomFixtureStaff = `
+  insert into ironclad_private.patch2_staff_authorizations (subject_digest, verification_reference)
+  select sha256(convert_to(actor,'UTF8')), 'Disposable CI Match Room fixture'
+  from (values ('match-room-test-1'),('match-room-test-4')) identities(actor);
+`;
+
 export function localClient(psql, { port = localPort(), database = "p03_rehearsal" } = {}) {
   assert(psql && Number.isInteger(port) && port > 1024 && port < 65536);
   assert(/^p03_[a-z0-9_]+$/.test(database));

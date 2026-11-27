@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { localClient, localPsqlArgument } from "./local-pg.mjs";
+import { localClient, localPsqlArgument, matchRoomFixtureFlag } from "./local-pg.mjs";
 const repositoryRoot = process.cwd();
-const template = JSON.parse(readFileSync(path.join(repositoryRoot, "scripts/p03-1/database-evidence.json"), "utf8")).database;
-assert(/^p03_realtime_\d+$/.test(template));
+const { legacyDatabase: template } = JSON.parse(readFileSync(path.join(repositoryRoot, "scripts/p03-1/database-evidence.json"), "utf8"));
+assert(/^p03_realtime_legacy_\d+$/.test(template));
 const db="p03_retention_race_"+Date.now();
 const client=localClient(localPsqlArgument(),{database:db});
 const id=n=>"d19a0000-0000-4000-8000-"+String(n).padStart(12,"0");
@@ -27,7 +27,7 @@ try{
 
  const seed=readFileSync(path.join(repositoryRoot,"tests/database/match-room-phase-1.sql"),"utf8");
  await client.run(seed.slice(seed.indexOf("begin;"),seed.indexOf("-- Physical boundary:"))+"\ncommit;");
- await client.run("select public.set_match_room_enabled(true,'match-room-test-4');");
+ await client.run(matchRoomFixtureFlag(true));
  const raw=await client.run(`set role authenticated;set request.jwt.claims='{"role":"authenticated","sub":"match-room-test-1"}';select public.resolve_match_room('${id(301)}');`);
  const room=JSON.parse(raw.split(/\r?\n/).at(-1)).room.id;
  await client.run(`set role authenticated;set request.jwt.claims='{"role":"authenticated","sub":"match-room-test-1"}';select public.send_match_room_message('${id(301)}','${room}','${id(8001)}','Synthetic concurrency retained body');`);

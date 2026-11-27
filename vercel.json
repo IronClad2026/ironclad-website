@@ -5,8 +5,10 @@
     "deploymentEnabled": {
       "codex/caster-phase-1-invitations": false,
       "codex/caster-phase-3-publication": false,
-      "codex/caster-phase-4-coverage": false
+      "codex/caster-phase-4-coverage": false,
+      "codex/caster-phase5-ci": false,
+      "codex/caster-phase5-acceptance": false
     }
   },
-  "ignoreCommand": "node -e \"process.exit(/^codex\\/(?:ready-wardrobe-(?:pilot|dashboard|catalogue)|caster-phase-(?:1-invitations|3-publication|4-coverage))$/.test(process.env.VERCEL_GIT_COMMIT_REF) ? 0 : 1)\""
+  "ignoreCommand": "node -e \"process.exit(/^codex\\/(?:ready-wardrobe-(?:pilot|dashboard|catalogue)|caster-phase-(?:1-invitations|3-publication|4-coverage)|caster-phase5-(?:ci|acceptance))$/.test(process.env.VERCEL_GIT_COMMIT_REF) ? 0 : 1)\""
 }

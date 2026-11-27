@@ -34,6 +34,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
+        id: dependencies
         run: npm ci
 
       - name: Lint
@@ -46,21 +47,28 @@ jobs:
         run: npm run test
 
       - name: Install browser test runtime
+        id: browser-runtime
+        if: ${{ !cancelled() && steps.dependencies.outcome == 'success' }}
         run: npx playwright install --with-deps chromium
 
       - name: Official News browser regression tests
+        if: ${{ !cancelled() && steps.browser-runtime.outcome == 'success' }}
         run: npx playwright test --config tests/browser/news/playwright.config.ts
 
       - name: Announcement editor desktop and mobile regressions
+        if: ${{ !cancelled() && steps.browser-runtime.outcome == 'success' }}
         run: npx playwright test --config tests/browser/announcements/playwright.config.ts
 
       - name: Match result and replay browser regression tests
+        if: ${{ !cancelled() && steps.browser-runtime.outcome == 'success' }}
         run: npx playwright test --config tests/browser/match-result/playwright.config.ts
 
       - name: Bracket geometry and private unread attention browser tests
+        if: ${{ !cancelled() && steps.browser-runtime.outcome == 'success' }}
         run: npx playwright test --config tests/browser/bracket-layout/playwright.config.ts
 
       - name: Match Room browser regression tests
+        if: ${{ !cancelled() && steps.browser-runtime.outcome == 'success' }}
         run: npx playwright test --config tests/browser/match-room/playwright.config.ts
 
       - name: Build
@@ -88,13 +96,13 @@ jobs:
         run: |
           /usr/lib/postgresql/17/bin/initdb -D "$RUNNER_TEMP/p03-realtime-postgres" -U postgres -A trust --no-locale --encoding=UTF8
           /usr/lib/postgresql/17/bin/pg_ctl -D "$RUNNER_TEMP/p03-realtime-postgres" -l "$RUNNER_TEMP/p03-realtime-postgres.log" -o "-h 127.0.0.1 -p 56623 -k $RUNNER_TEMP" -w start
-      - name: Replay Staging migrations and P03 SQL regressions
+      - name: Replay all Staging migrations, current Patch 2 authority and pinned historical Match Room behavior
         run: node scripts/p03-1/database.mjs /usr/lib/postgresql/17/bin/psql
-      - name: Four-division authority, lifecycle, and Pro regression tests
+      - name: Four-division authority, lifecycle, and historical plus current Match Room tests
         run: node scripts/four-division/database.mjs /usr/lib/postgresql/17/bin/psql
-      - name: Realtime transaction and generation concurrency
+      - name: Historical Realtime transaction and generation concurrency
         run: node scripts/p03-1/realtime-concurrency.mjs /usr/lib/postgresql/17/bin/psql
-      - name: Existing P03 and retention concurrency; migration retry safety
+      - name: Historical Match Room concurrency and full-head replay and result checks
         run: |
           node scripts/p03-1/concurrency.mjs /usr/lib/postgresql/17/bin/psql
           node scripts/p03-1/attention-concurrency.mjs /usr/lib/postgresql/17/bin/psql

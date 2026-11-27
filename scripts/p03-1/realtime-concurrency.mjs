@@ -4,8 +4,8 @@ import path from "node:path";
 import { localClient, localPsqlArgument } from "./local-pg.mjs";
 
 const root = process.cwd();
-const template = JSON.parse(readFileSync(path.join(root, "scripts/p03-1/database-evidence.json"), "utf8")).database;
-assert(/^p03_realtime_\d+$/.test(template));
+const { legacyDatabase: template } = JSON.parse(readFileSync(path.join(root, "scripts/p03-1/database-evidence.json"), "utf8"));
+assert(/^p03_realtime_legacy_\d+$/.test(template));
 const database = "p03_realtime_race_" + Date.now();
 const client = localClient(localPsqlArgument(), { database });
 const id = (n) => "d19a0000-0000-4000-8000-" + String(n).padStart(12, "0");

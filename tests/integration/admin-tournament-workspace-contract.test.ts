@@ -1055,8 +1055,20 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
         "20261113071907_patch2_retire_legacy_registration_writes.sql",
         "20261113072932_patch2_verify_private_assistance_privacy_operators.sql",
         "20261114064733_patch2_match_staff_authorization.sql",
+        // Checked-in receipts are explicit so unknown migrations fail CI.
+        // Hosted timestamp mappings and budget availability are release gates.
+        "20261116121500_ready_ai_budget.sql",
+        "20261117090000_ready_usage_tracking.sql",
+        "20261117143000_ready_cloud_usage.sql",
+        "20261117190000_ready_topic_suggestions.sql",
+        "20261122055154_ready_wardrobe_pilot.sql",
+        "20261122060436_ready_wardrobe_pilot_verified_stack.sql",
+        "20261124090000_ready_wardrobe_catalogue.sql",
         "20261126094926_caster_phase1_invitations.sql",
         "20261126120736_caster_phase1_continuations.sql",
+        "20261126222005_caster_phase2_applications.sql",
+        "20261126225939_caster_phase3_publication.sql",
+        "20261126233910_caster_phase4_coverage.sql",
       ]);
 
     const badgeIntegrationMigrationNames = new Set([
