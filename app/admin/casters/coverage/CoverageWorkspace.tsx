@@ -3,10 +3,9 @@ import AdminAccessRequired from "@/components/admin/AdminAccessRequired";
 import { casterAdminApplicationPage } from "../admin-application-contracts";
 import { casterAdminFrame, casterAdminInput, casterAdminPanel, casterAdminSecondary } from "../admin-application-styles";
 import CasterAdminNavigation from "../CasterAdminNavigation";
-import AssignmentBuilder from "./AssignmentBuilder";
 import AssignmentList from "./AssignmentList";
 import { CASTER_COVERAGE_ADMIN_PATH, coverageWorkspaceHref } from "./contracts";
-import { currentCastingAdmin, loadCastingAssignments, loadCastingCasters, loadCastingChoices, loadCastingTournaments } from "./data";
+import { currentCastingAdmin, loadCastingAssignments, loadCastingChoices, loadCastingTournaments } from "./data";
 
 type WorkspaceProps = {
   tournament?: string;
@@ -22,10 +21,9 @@ export default async function CoverageWorkspace({ tournament, page, tournamentQu
   const eventPage = casterAdminApplicationPage(tournamentPage);
   const query = typeof tournamentQuery === "string" && tournamentQuery.length <= 100 && !/[\u0000-\u001f\u007f]/.test(tournamentQuery)
     ? tournamentQuery.trim() : "";
-  const [assignments, choices, casters, events] = await Promise.all([
+  const [assignments, choices, events] = await Promise.all([
     loadCastingAssignments(actor, tournament ?? null, assignmentPage),
     tournament ? loadCastingChoices(tournament) : null,
-    tournament ? loadCastingCasters(actor, "", 1) : null,
     tournament ? null : loadCastingTournaments(query, eventPage),
   ]);
   if (!(await currentCastingAdmin())) return <AdminAccessRequired />;
@@ -43,16 +41,11 @@ export default async function CoverageWorkspace({ tournament, page, tournamentQu
   const workspace = (
     <div className="grid min-w-0 gap-5">
       {tournament ? (
-        <>
-          <div><Link href={CASTER_COVERAGE_ADMIN_PATH} prefetch={false} className={casterAdminSecondary}>All caster assignments</Link></div>
-          {choices && casters ? <AssignmentBuilder tournament={tournament} choices={choices} initialCasters={casters} /> : (
-            <p role="alert" className={`${casterAdminPanel} text-orange-200`}>Current competition options could not be loaded. Reload before scheduling coverage.</p>
-          )}
-        </>
+        <div><Link href={CASTER_COVERAGE_ADMIN_PATH} prefetch={false} className={casterAdminSecondary}>All archived coverage</Link></div>
       ) : (
         <section className={`${casterAdminPanel} space-y-4`} aria-labelledby="casting-tournaments-title">
           <h2 id="casting-tournaments-title" className="text-lg font-black">Choose a tournament</h2>
-          <p className="text-sm text-zinc-400">Open a tournament’s Casting workspace to assign casters and manage coverage for its divisions and matches.</p>
+          <p className="text-sm text-zinc-400">Review legacy coverage and correct verified records. Manage self-published videos in Tournament videos.</p>
           <form action={CASTER_COVERAGE_ADMIN_PATH} className="flex flex-wrap items-end gap-2">
             {assignmentPage > 1 && <input type="hidden" name="page" value={assignmentPage} />}
             <label className="min-w-48 flex-1 space-y-1 text-sm font-bold">
@@ -76,15 +69,15 @@ export default async function CoverageWorkspace({ tournament, page, tournamentQu
       {assignments ? (
         <>
           <AssignmentList assignments={assignments.assignments} choices={choices} scoped={Boolean(tournament)} />
-          <CoveragePagination page={assignmentPage} hasMore={assignments.hasMore} label="Casting assignment pages" href={assignmentHref} />
+          <CoveragePagination page={assignmentPage} hasMore={assignments.hasMore} label="Archived coverage pages" href={assignmentHref} />
         </>
-      ) : <p role="alert" className={`${casterAdminPanel} text-orange-200`}>The casting assignment history could not be loaded. Try again.</p>}
+      ) : <p role="alert" className={`${casterAdminPanel} text-orange-200`}>Archived coverage could not be loaded. Try again.</p>}
     </div>
   );
   if (tournament) return workspace;
   return (
     <main className={casterAdminFrame}>
-      <h1 className="text-3xl font-black sm:text-4xl">Caster coverage</h1>
+      <h1 className="text-3xl font-black sm:text-4xl">Caster coverage archive</h1>
       <CasterAdminNavigation current="coverage" />
       {workspace}
     </main>

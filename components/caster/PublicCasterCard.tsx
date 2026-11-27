@@ -11,13 +11,15 @@ const platformNames = {
 
 type AvatarSource = Pick<Caster, "slug" | "publication_id"> & { avatar: string | null };
 
-export function PublicCasterAvatar({ caster, large = false, compact = false }: { caster: AvatarSource; large?: boolean; compact?: boolean }) {
+export function PublicCasterAvatar({ caster, large = false, compact = false, source }: {
+  caster: AvatarSource; large?: boolean; compact?: boolean; source?: string;
+}) {
   return (
     <span aria-hidden="true" className={`relative grid shrink-0 place-items-center overflow-hidden border border-orange-400/35 bg-zinc-900 text-orange-300 ${large ? "size-20 sm:size-28" : compact ? "size-10" : "size-16"}`}>
       <UserRound size={large ? 32 : compact ? 18 : 26} />
       {caster.avatar ? (
         <Image
-          unoptimized fill src={casterPublicMediaPath(caster.slug, caster.publication_id, caster.avatar)} alt=""
+          unoptimized fill src={source ?? casterPublicMediaPath(caster.slug, caster.publication_id, caster.avatar)} alt=""
           sizes={large ? "(min-width: 640px) 112px, 80px" : compact ? "40px" : "64px"} className="object-cover"
         />
       ) : null}
@@ -25,27 +27,30 @@ export function PublicCasterAvatar({ caster, large = false, compact = false }: {
   );
 }
 
-export default function PublicCasterCard({ caster, copy, promote = false, animate = false }: {
+export default function PublicCasterCard({ caster, copy, promote = false, repeat = false, documentNavigation = false }: {
   caster: Caster;
   copy: PublicCasterCopy;
   promote?: boolean;
-  animate?: boolean;
+  repeat?: boolean;
+  documentNavigation?: boolean;
 }) {
   const Heading = promote ? "h3" : "h2";
+  const ProfileLink = documentNavigation ? "a" : Link;
   return (
-    <Link
-      href={casterPublicProfilePath(caster.slug)} prefetch={false}
-      className={`group flex h-full min-w-0 flex-col border border-white/15 border-t-orange-400/65 bg-zinc-950 p-5 transition-colors hover:border-orange-400/55 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300 ${promote ? "justify-center sm:p-7" : ""}`}
+    <ProfileLink
+      href={casterPublicProfilePath(caster.slug)} {...(documentNavigation ? {} : { prefetch: false })}
+      tabIndex={repeat ? -1 : undefined}
+      className={`group flex h-full min-w-0 flex-col border border-white/15 border-t-orange-400/65 bg-zinc-950 p-5 transition-colors hover:border-orange-400/55 focus-visible:outline-2 focus-visible:outline-orange-300 ${promote ? "justify-center focus-visible:-outline-offset-2" : "focus-visible:outline-offset-4"}`}
     >
       <div className={promote ? "relative grow content-center" : "grow"}>
-        <div key={caster.slug} data-caster-slide-content={animate ? "true" : undefined}>
+        <div>
           <div className="flex min-w-0 items-start gap-4">
-            <PublicCasterAvatar caster={caster} large={promote} />
+            <PublicCasterAvatar caster={caster} />
             <div className="min-w-0 grow">
               <p className="flex items-start gap-1.5 text-xs leading-5 font-bold text-orange-300">
                 <Mic2 size={14} aria-hidden="true" className="mt-0.5 shrink-0" />{copy.designation}
               </p>
-              <Heading className={`mt-1 line-clamp-2 font-black leading-tight text-white [overflow-wrap:anywhere] ${promote ? "text-2xl sm:text-3xl" : "text-lg"}`}>
+              <Heading className={`mt-1 line-clamp-2 font-black leading-tight text-white [overflow-wrap:anywhere] ${promote ? "text-xl" : "text-lg"}`}>
                 {caster.display_name}
               </Heading>
               <p className="mt-2 line-clamp-2 text-sm leading-5 text-zinc-300 [overflow-wrap:anywhere]">
@@ -75,6 +80,6 @@ export default function PublicCasterCard({ caster, copy, promote = false, animat
       <span className="mt-4 inline-flex items-center gap-2 text-sm font-bold text-orange-300 group-hover:text-orange-200">
         {copy.profile}<ArrowRight size={16} aria-hidden="true" className="shrink-0" />
       </span>
-    </Link>
+    </ProfileLink>
   );
 }

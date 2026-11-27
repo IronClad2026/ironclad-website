@@ -1,6 +1,8 @@
 "use client";
 
 import { ExternalLink, PlayCircle } from "lucide-react";
+import { useEffect, useRef } from "react";
+import Link from "next/link";
 import { CasterCoverageList, selectPublicCasterCoverage } from "@/components/caster/CasterCoverage";
 import { useOptionalLocale, useOptionalTranslations } from "@/components/i18n/LocaleProvider";
 import competitionEnglish from "@/lib/i18n/dictionaries/en/competition";
@@ -25,9 +27,23 @@ export default function TournamentMedia({
   const locale = useOptionalLocale();
   const media = tournament.media ?? [];
   const coverage = selectPublicCasterCoverage(tournament.casterCoverage ?? []);
+  const root = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    function focusVideo() {
+      const target = /^#tournament-media-([a-f0-9-]{36})$/i.exec(window.location.hash)?.[1];
+      if (!target || !root.current?.getClientRects().length) return;
+      const item = root.current.querySelector<HTMLElement>(`[data-tournament-media-id="${target}"]`);
+      item?.scrollIntoView({ block: "start" });
+      item?.focus({ preventScroll: true });
+    }
+    const frame = window.requestAnimationFrame(focusVideo);
+    window.addEventListener("hashchange", focusVideo);
+    return () => { window.cancelAnimationFrame(frame); window.removeEventListener("hashchange", focusVideo); };
+  }, [media.length, tournament.id]);
 
   return (
     <div
+      ref={root}
       className="w-full max-w-full min-w-0"
       data-tournament-media-presentation={presentation}
     >
@@ -50,7 +66,7 @@ export default function TournamentMedia({
           }
         >
           {media.map((item) => (
-            <li key={item.id} className="min-w-0">
+            <li key={item.id} className="min-w-0 scroll-mt-32 focus-visible:outline-2 focus-visible:outline-orange-300" tabIndex={-1} data-tournament-media-id={item.id}>
               <a
                 aria-label={`${t("tournaments.media.watch")}: ${item.title}. ${t("tournaments.media.opensNewTab")}`}
                 className="group flex min-h-44 w-full min-w-0 flex-col overflow-hidden border border-white/12 bg-black/45 p-4 text-left shadow-xl shadow-black/20 transition hover:-translate-y-1 hover:border-orange-400/45 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400"
@@ -79,12 +95,14 @@ export default function TournamentMedia({
                     {item.description}
                   </p>
                 ) : null}
+                {item.casterScopeLabel && <p className="mt-2 min-w-0 break-words text-sm text-zinc-400">{item.casterScopeLabel}</p>}
 
                 <span className="mt-auto inline-flex min-h-11 items-center gap-2 pt-4 text-xs font-black uppercase tracking-wider text-orange-300 group-hover:text-orange-200">
                   {t("tournaments.media.watch")}
                   <ExternalLink aria-hidden="true" size={15} />
                 </span>
               </a>
+              {item.casterName && item.casterProfileHref && <Link href={item.casterProfileHref} className="inline-flex min-h-11 items-center px-1 text-sm font-semibold text-orange-200 underline decoration-orange-400/40 underline-offset-4 hover:text-white">{item.casterName}</Link>}
             </li>
           ))}
         </ul>

@@ -26,6 +26,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Use Node.js 22.12.0
         uses: actions/setup-node@v4
@@ -71,6 +73,10 @@ jobs:
         if: ${{ !cancelled() && steps.browser-runtime.outcome == 'success' }}
         run: npx playwright test --config tests/browser/match-room/playwright.config.ts
 
+      - name: Continuous Caster Showcase browser regressions
+        if: ${{ !cancelled() && steps.browser-runtime.outcome == 'success' }}
+        run: npx playwright test --config tests/browser/ui-redesign/playwright.config.ts caster-showcase.spec.ts
+
       - name: Build
         if: ${{ !cancelled() }}
         run: npm run build
@@ -81,6 +87,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Use Node.js 22.12.0
         uses: actions/setup-node@v4
         with:
@@ -109,6 +117,17 @@ jobs:
           node scripts/p03-1/retention-concurrency.mjs /usr/lib/postgresql/17/bin/psql
           node scripts/p03-1/repeatability.mjs /usr/lib/postgresql/17/bin/psql
           node scripts/p03-1/result-regressions.mjs /usr/lib/postgresql/17/bin/psql
+      - name: Caster Tournament Media transition and concurrency
+        env:
+          P03_PG_PORT: '56624'
+        run: |
+          set -euo pipefail
+          pg_bin=/usr/lib/postgresql/17/bin
+          pg_dir="$RUNNER_TEMP/caster-tournament-media-postgres"
+          "$pg_bin/initdb" -D "$pg_dir" -U postgres -A trust --no-locale --encoding=UTF8
+          trap '"$pg_bin/pg_ctl" -D "$pg_dir" -m fast -w stop' EXIT
+          "$pg_bin/pg_ctl" -D "$pg_dir" -l "$RUNNER_TEMP/caster-tournament-media.log" -o "-h 127.0.0.1 -p 56624 -k $RUNNER_TEMP" -w start
+          node tests/database/caster-phase4-coverage.mjs "$pg_bin/psql"
       - name: Stop disposable PostgreSQL
         if: always()
         run: |

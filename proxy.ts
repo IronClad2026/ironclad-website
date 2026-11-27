@@ -6,12 +6,18 @@ import {
   isSelfAuthenticatedApiPathname,
 } from "@/lib/route-access";
 import { getCasterInvitationOrigin } from "@/lib/caster/environment";
+import { canReadCasterPublicHome } from "@/lib/caster/public-home-access";
+import { loadPublicCasterProfile } from "@/lib/caster/public-directory";
 import {
   CASTER_CHROME_HEADER,
   CASTER_PREPARE_PATH,
+  CASTER_PUBLIC_HOME_CHROME,
   CASTER_SIGN_IN_PATH,
+  casterProfileDocumentSegment,
   isCasterInvitationRead,
+  isCasterPublicHomeRead,
 } from "@/lib/caster/routes";
+import { unavailableCasterProfileResponse } from "@/lib/caster/unavailable-profile-response";
 import { isReadyStagingEnabled } from "@/lib/ready/review-access";
 import { isReadyWardrobePilotEnabled } from "@/lib/wardrobe/environment";
 import {
@@ -89,11 +95,22 @@ const authenticatedProxy = clerkMiddleware(async (auth, request) => {
   if (isNoticeAccessPost(pathname) && request.method === "POST") {
     return NextResponse.next({ request: { headers: requestHeaders } });
   }
-  const { userId } = await auth();
+  const { userId, sessionId, sessionClaims } = await auth();
   if (!userId) return NextResponse.next({ request: { headers: requestHeaders } });
 
   const notice = await loadPublicGamingProfileNotice(userId);
   if (notice === "required" || notice === "unavailable") {
+    // This marker only selects the read-only homepage. The existing notice
+    // remains required for other pages, APIs and every Server Action.
+    if (notice === "required" && casterOrigin && sessionId &&
+      isCasterPublicHomeRead(pathname, request.method) && !requestHeaders.has("next-action") &&
+      (sessionClaims?.metadata as { role?: unknown } | undefined)?.role !== "admin" &&
+      await canReadCasterPublicHome(userId, sessionId)) {
+      requestHeaders.set(CASTER_CHROME_HEADER, CASTER_PUBLIC_HOME_CHROME);
+      const response = NextResponse.next({ request: { headers: requestHeaders } });
+      response.headers.set("Cache-Control", "private, no-store");
+      return response;
+    }
     if (isPageRead && isNoticeAccessDocument(pathname)) {
       requestHeaders.set(NOTICE_LAYOUT_HEADER, "public-document");
       return NextResponse.next({ request: { headers: requestHeaders } });
@@ -119,7 +136,7 @@ function continueStandalone(request: NextRequest) {
   return NextResponse.next({ request: { headers: requestHeaders } });
 }
 
-export default function proxy(request: NextRequest, event: NextFetchEvent) {
+export default async function proxy(request: NextRequest, event: NextFetchEvent) {
   // Clerk can redirect from its session handshake before the callback runs.
   // Serve the standalone invitation shell first so the browser clears the
   // fragment before any redirect can carry it to the identity provider.
@@ -130,6 +147,12 @@ export default function proxy(request: NextRequest, event: NextFetchEvent) {
     if (request.headers.has("next-action")) return new NextResponse(null, { status: 403 });
     return continueStandalone(request);
   }
+  // The root loading boundary can start streaming before a page calls
+  // notFound(). Reject unavailable profile document reads before that point.
+  const profile = casterProfileDocumentSegment(request.nextUrl.pathname, request.method);
+  if (profile && !request.headers.has("next-action") && !(await loadPublicCasterProfile(profile))) {
+    return unavailableCasterProfileResponse(request);
+  }
   return authenticatedProxy(request, event);
 }
 
@@ -137,6 +160,8 @@ export const config = {
   matcher: [
     "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|mp3|webm|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
     "/(api|trpc)(.*)",
+    // The App Router accepts file-like profile segments too.
+    "/casters/:slug",
     // A dynamic document can have a file-like URL excluded by the first
     // matcher. Strip supplied chrome markers even on those requests.
     { source: "/:path*", has: [{ type: "header", key: "x-ironclad-caster-chrome" }] },

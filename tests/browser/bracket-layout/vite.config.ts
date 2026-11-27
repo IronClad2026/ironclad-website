@@ -19,13 +19,18 @@ const rejectServerCode: Plugin = {
   },
 };
 
-// Reuse the existing test-only service stubs and action virtualization; no
-// existing harness files or application modules are modified by this fixture.
-export default defineConfig(mergeConfig(base, {
+// Reuse the existing test-only service stubs and action virtualization.
+const config = mergeConfig(base, {
   root: sourceRoot,
+  cacheDir: resolve(sourceRoot, ".release-local/vite-cache-bracket-layout"),
   envDir: support("no-environment-files"),
   envPrefix: "BRACKET_FIXTURE_UNUSED_",
   plugins: [rejectServerCode],
-  optimizeDeps: { entries: [support("index.html")] },
   server: { host: "127.0.0.1", port: 3223, strictPort: true, fs: { allow: [sourceRoot] } },
-}));
+});
+
+export default defineConfig({
+  ...config,
+  // Vite concatenates arrays during merges. Scan only the Bracket entry.
+  optimizeDeps: { ...config.optimizeDeps, entries: [support("index.html")] },
+});

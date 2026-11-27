@@ -39,7 +39,10 @@ function isolatedActions(): Plugin {
 
 export default defineConfig({
   root,
-  optimizeDeps: { entries: [support("index.html")] },
+  optimizeDeps: {
+    entries: [support("index.html"), support("caster-showcase.html")],
+    include: ["react", "react/jsx-runtime", "react-dom", "react-dom/client", "lucide-react"],
+  },
   envDir: support("no-environment-files"),
   envPrefix: "UI_FIXTURE_UNUSED_",
   plugins: [isolatedActions(), {

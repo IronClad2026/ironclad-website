@@ -136,7 +136,6 @@ export default async function TournamentWorkspacePage({
       <section className="mx-auto max-w-7xl">
         <TournamentWorkspaceHeader
           activeSection={section}
-          castingEnabled={castingEnabled}
           summary={registrationData
             ? { ...workspace.summary, approvedPlayers: registrationData.counts.approved }
             : workspace.summary}
