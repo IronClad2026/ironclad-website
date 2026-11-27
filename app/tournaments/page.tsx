@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import TournamentsExperience from "@/components/TournamentsExperience";
 import type { CasterCoverageAssignment } from "@/lib/caster/coverage";
 import { loadPublicCasterSchedules } from "@/lib/caster/coverage-server";
+import { loadCombinedTournamentMedia } from "@/lib/caster/tournament-video-server";
 import { loadEffectiveRegistrationDocumentSet } from "@/lib/legal-documents";
 import { loadTournamentPollsForRequest } from "@/lib/player-polls";
 import { loadMatchResultData } from "@/lib/match-result-data";
@@ -212,7 +213,7 @@ export default async function TournamentsPage({
       .filter((bracket) => bracket.map_pool_published_at !== null)
       .map((bracket) => bracket.id)
   );
-  const [mapPoolEntryResult, tournamentMediaResult, casterCoverage] = await Promise.all([
+  const [mapPoolEntryResult, combinedMedia, casterCoverage] = await Promise.all([
     publishedMapPoolBracketIds.length > 0
       ? supabase
           .from("tournament_bracket_map_pool_entries")
@@ -223,22 +224,19 @@ export default async function TournamentsPage({
           .is("removed_at", null)
           .order("added_at", { ascending: true })
       : Promise.resolve({ data: [], error: null }),
-    tournamentRows.length > 0
-      ? supabase
-          .from("tournament_media")
-          .select(
-            "id, tournament_id, title, url, media_type, description, match_id, published, created_at, updated_at"
-          )
-          .in(
-            "tournament_id",
-            tournamentRows.map((tournament) => tournament.id)
-          )
-          .eq("published", true)
-          .order("created_at", { ascending: false })
-          .order("id", { ascending: false })
-      : Promise.resolve({ data: [], error: null }),
+    loadCombinedTournamentMedia([...includedTournamentIds]),
     loadPublicCasterSchedules([...includedTournamentIds]),
   ]);
+
+  // The old published-only read stays safe during rollout or recovery. The
+  // database permanently keeps canonical caster-managed rows false here.
+  const tournamentMediaResult = combinedMedia !== null || !includedTournamentIds.size
+    ? { data: combinedMedia ?? [], error: null }
+    : await supabase.from("tournament_media")
+        .select("id, tournament_id, title, url, media_type, description, match_id, published, created_at, updated_at")
+        .in("tournament_id", [...includedTournamentIds]).eq("published", true)
+        .order("created_at", { ascending: false }).order("id", { ascending: false });
+  const casterByMediaId = new Map((combinedMedia ?? []).filter((item) => item.casterProfileHref).map((item) => [item.id, item]));
 
   if (mapPoolEntryResult.error) {
     console.error("Published tournament map pools failed to load.");
@@ -260,18 +258,12 @@ export default async function TournamentsPage({
     throw new Error("Tournament data could not be loaded.");
   }
 
-  const parsedTournamentMedia = [];
-
-  for (const row of tournamentMediaResult.data) {
+  const parsedTournamentMedia = combinedMedia ?? tournamentMediaResult.data.map((row) => {
     const parsed = parseTournamentMediaDatabaseRow(row);
-
-    if (!parsed) {
-      console.error("Published tournament media contained an invalid row.");
-      throw new Error("Tournament data could not be loaded.");
-    }
-
-    parsedTournamentMedia.push(parsed);
-  }
+    if (parsed) return parsed;
+    console.error("Published tournament media contained an invalid row.");
+    throw new Error("Tournament data could not be loaded.");
+  });
 
   const mediaByTournament = new Map<string, TournamentMediaItem[]>();
   const casterCoverageByTournament = new Map<string, CasterCoverageAssignment[]>();
@@ -289,12 +281,14 @@ export default async function TournamentsPage({
     }
 
     const items = mediaByTournament.get(media.tournamentId) ?? [];
+    const caster = casterByMediaId.get(media.id);
     items.push({
       id: media.id,
       title: media.title,
       url: media.url,
       mediaType: media.mediaType,
       description: media.description,
+      ...(caster && { casterName: caster.casterName, casterProfileHref: caster.casterProfileHref, casterScopeLabel: caster.casterScopeLabel }),
     });
     mediaByTournament.set(media.tournamentId, items);
   }

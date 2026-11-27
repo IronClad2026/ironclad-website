@@ -19,7 +19,7 @@ body {
   min-height: 100svh;
   margin: 0;
   padding: clamp(1rem, 4vw, 3rem);
-  background: radial-gradient(ellipse at 32% 20%, rgb(249 115 22 / 0.09), transparent 45%), #000;
+  background: radial-gradient(ellipse at 34% 15%, rgb(249 115 22 / 0.10), transparent 50%), #000;
 }
 
 button, input { font: inherit; }
@@ -33,9 +33,10 @@ a:hover { color: var(--text); }
 
 .invitation {
   display: grid;
-  grid-template-columns: minmax(10rem, 0.44fr) minmax(0, 1fr);
-  width: min(100%, 54rem);
+  grid-template-columns: minmax(11rem, 0.47fr) minmax(0, 1fr);
+  width: min(100%, 58rem);
   margin-inline: auto;
+  overflow: hidden;
   border: 1px solid var(--border);
   border-top: 2px solid var(--orange-500);
   background: #09090b;
@@ -43,25 +44,41 @@ a:hover { color: var(--text); }
 }
 
 .brand {
+  position: relative;
+  isolation: isolate;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  place-items: start center;
-  padding: 3.1rem 1rem 2rem;
+  place-items: center;
+  padding: clamp(1.5rem, 4vw, 2.9rem);
   border-right: 1px solid var(--border);
-  background: linear-gradient(158deg, rgb(249 115 22 / 0.08), transparent 58%), #0a0a0a;
+  background: #0a0a0a;
 }
 
-.brand img { width: min(8.75rem, 100%); height: auto; }
+.brand::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(155deg, rgb(249 115 22 / 0.08), rgb(0 0 0 / 0.8) 55%, #09090b 95%),
+    url("/images/ironclad-background.jpg") center / cover;
+  content: "";
+}
+
+.brand img {
+  width: min(9.7rem, 100%);
+  height: auto;
+  filter: drop-shadow(0 0.55rem 2.25rem rgb(0 0 0 / 0.70));
+}
 
 .body { min-width: 0; padding: clamp(1.4rem, 4vw, 2.75rem); }
 
 h1 {
   margin: 0 0 1rem;
-  font-size: clamp(1.75rem, 2.3vw + 0.65rem, 2.65rem);
+  font-size: clamp(1.75rem, 2.45vw + 0.65rem, 2.8rem);
   letter-spacing: -0.035em;
   line-height: 1.08;
   font-weight: 900;
   text-wrap: pretty;
+  overflow-wrap: anywhere;
 }
 
 .description, .notice p { line-height: 1.52; }
@@ -77,11 +94,17 @@ h1 {
 }
 
 .benefits li {
-  border-top: 1px solid var(--orange-400);
-  padding-top: 0.45rem;
-  font-size: 0.83rem;
+  display: flex;
+  align-items: center;
+  min-height: 3.35rem;
+  border: 1px solid var(--border);
+  border-top-color: var(--orange-400);
+  padding: 0.5rem 0.6rem;
+  background: rgb(255 255 255 / 0.035);
+  font-size: 0.82rem;
   line-height: 1.35;
   font-weight: 700;
+  overflow-wrap: anywhere;
 }
 
 .notice {
@@ -97,7 +120,7 @@ h1 {
 .notice p { margin: 0; }
 .notice p + p { margin-top: 0.25rem; }
 
-.actions { display: flex; flex-wrap: wrap; gap: 0.55rem; }
+.actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.55rem; }
 
 .button {
   display: inline-flex;
@@ -112,6 +135,7 @@ h1 {
   font-size: 0.875rem;
   line-height: 1.25;
   font-weight: 900;
+  overflow-wrap: anywhere;
   cursor: pointer;
   transition: background-color 140ms ease, border-color 140ms ease;
 }
@@ -162,17 +186,18 @@ h1 {
 
 @media (max-width: 42rem) {
   .invitation { grid-template-columns: minmax(0, 1fr); }
-  .brand { place-items: center; padding: 1.35rem 1rem 0; border-right: 0; background: transparent; }
-  .brand img { width: 4.65rem; }
-  .body { padding: 1.15rem; }
-  .actions { flex-direction: column; }
-  .actions .button { width: 100%; }
-  .benefits { gap: 0.5rem; }
+  .brand { padding: 1rem; border-right: 0; border-bottom: 1px solid var(--border); }
+  .brand::before { background-position: center, center 32%; }
+  .brand img { width: 4.35rem; }
+  .body { padding: clamp(1rem, 4vw, 1.55rem); }
+  .actions { grid-template-columns: minmax(0, 1fr); }
+  .benefits { gap: 0.45rem; }
+  .benefits li { padding-inline: 0.45rem; }
 }
 
 @media (max-width: 24rem) {
-  .benefits { grid-template-columns: minmax(0, 1fr); }
-  .benefits li { border-top: 0; border-left: 1px solid var(--orange-400); padding: 0.06rem 0 0.06rem 0.45rem; }
+  .benefits { grid-template-columns: minmax(0, 1fr); gap: 0.25rem; }
+  .benefits li { min-height: 0; border-top-color: var(--border); border-left: 1px solid var(--orange-400); padding: 0.4rem 0.55rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -9,7 +9,8 @@ const sections = [
   { key: "applications", href: CASTER_APPLICATIONS_ADMIN_PATH, label: "Applications" },
   { key: "grants", href: CASTER_GRANTS_ADMIN_PATH, label: "Grant caster access" },
   { key: "moderation", href: CASTER_MODERATION_PATH, label: "Moderation" },
-  { key: "coverage", href: CASTER_COVERAGE_ADMIN_PATH, label: "Casting coverage" },
+  { key: "videos", href: "/admin/casters/tournament-videos", label: "Tournament videos" },
+  { key: "coverage", href: CASTER_COVERAGE_ADMIN_PATH, label: "Verified history" },
 ] as const;
 
 export default function CasterAdminNavigation({ current }: { current: (typeof sections)[number]["key"] }) {

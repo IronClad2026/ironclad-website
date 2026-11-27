@@ -7,34 +7,41 @@ import type { PublicCasterCopy } from "@/lib/caster/public-copy";
 
 type Copy = Pick<PublicCasterCopy, "loadPlayer" | "hidePlayer" | "watch" | "playerLabel">;
 
-export default function CasterFeaturedPlayers({ videos, copy }: { videos: CasterFeaturedVideo[]; copy: Copy }) {
+export default function CasterFeaturedPlayers({ videos, copy, watchOnly = false }: {
+  videos: CasterFeaturedVideo[]; copy: Copy; watchOnly?: boolean;
+}) {
   return (
     <ul className="grid gap-4 sm:grid-cols-2">
-      {videos.map((video) => <VideoPlayerCard key={`${video.kind}-${video.id}`} video={video} copy={copy} />)}
+      {videos.map((video) => (
+        <li key={`${video.kind}-${video.id}`} className="min-w-0 border border-white/15 bg-zinc-950 p-4">
+          <CasterVideoPlayer video={video} copy={copy} watchOnly={watchOnly} />
+        </li>
+      ))}
     </ul>
   );
 }
 
-function VideoPlayerCard({ video, copy }: { video: CasterFeaturedVideo; copy: Copy }) {
+export function CasterVideoPlayer({ video, copy, watchOnly = false }: {
+  video: CasterFeaturedVideo; copy: Copy; watchOnly?: boolean;
+}) {
   const playerArea = useRef<HTMLDivElement>(null);
   const [placement, setPlacement] = useState({ width: 0, parent: "" });
   const [requested, setRequested] = useState(false);
   const isYoutube = video.kind === "youtube";
   const provider = isYoutube ? "YouTube" : "Twitch";
   const embedUrl = casterFeaturedEmbedUrl(video, placement.parent);
-  const canEmbed = Boolean(embedUrl) && placement.width >= (isYoutube ? 200 : 400);
+  const canEmbed = !watchOnly && Boolean(embedUrl) && placement.width >= (isYoutube ? 200 : 400);
 
   useEffect(() => {
     const element = playerArea.current;
-    if (!element || typeof ResizeObserver === "undefined") return;
+    if (watchOnly || !element || typeof ResizeObserver === "undefined") return;
     const observer = new ResizeObserver(([entry]) => setPlacement({ width: entry.contentRect.width, parent: window.location.hostname }));
     observer.observe(element);
     return () => observer.disconnect();
-  }, []);
+  }, [watchOnly]);
 
   const playerSource = canEmbed && requested ? embedUrl : null;
   return (
-    <li className="min-w-0 border border-white/15 bg-zinc-950 p-4">
       <div ref={playerArea}>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           {canEmbed ? (
@@ -61,6 +68,5 @@ function VideoPlayerCard({ video, copy }: { video: CasterFeaturedVideo; copy: Co
           />
         ) : null}
       </div>
-    </li>
   );
 }

@@ -1076,6 +1076,7 @@ describe("PR 5 Admin Tournament workspace source contract", () => {
         "20261126233910_caster_phase4_coverage.sql",
         "20261127032523_ready_suggestion_private_rate_key.sql",
         "20261127033003_patch2_live_profile_disclosure_bridge.sql",
+        "20261127052305_caster_tournament_media.sql",
       ]);
 
     const badgeIntegrationMigrationNames = new Set([

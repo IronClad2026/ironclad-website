@@ -23,10 +23,11 @@ export async function loadPublicCasterSchedules(tournaments: string[]): Promise<
   for (let start = 0; start < distinct.length; start += 50) {
     const ids = distinct.slice(start, start + 50);
     const allowed = new Set(ids);
-    const result = await casterRpc<unknown>("caster_phase4_public_schedules", { p_tournament_ids: ids });
+    const result = await casterRpc<unknown>("caster_media_public_verified_tournaments", { p_tournament_ids: ids })
+      ?? await casterRpc<unknown>("caster_phase4_public_schedules", { p_tournament_ids: ids });
     rows.push(...list(result).flatMap((row) => {
       if (!allowed.has(row.tournament_id) || !row.caster || !row.target_available ||
-          (row.status !== "scheduled" && row.status !== "completed")) return [];
+          row.status !== "completed") return [];
       delete row.application_id;
       delete row.conflict;
       return [row];
@@ -52,8 +53,10 @@ export async function loadCasterAssignments(actor: string): Promise<CasterCovera
   try {
     const { userId, sessionId } = await auth();
     if (userId !== actor || !sessionId) return [];
-    const result = await casterRpc<{ status?: unknown; assignments?: unknown }>("caster_phase4_owner", { p_actor: actor });
-    if (result?.status === "ok") return list(result.assignments);
+    type OwnerCoverage = { status?: unknown; assignments?: unknown };
+    const result = await casterRpc<OwnerCoverage>("caster_media_owner_verified_history", { p_actor: actor })
+      ?? await casterRpc<OwnerCoverage>("caster_phase4_owner", { p_actor: actor });
+    if (result?.status === "ok") return list(result.assignments).filter((row) => row.status === "completed" && row.verified_at && row.covered_at);
     return result?.status === "not_found" || result?.status === "closed" ? [] : null;
   } catch {
     return null;

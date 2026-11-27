@@ -1,5 +1,6 @@
 import { CASTER_APPLICATION_PATH, CASTER_MEDIA_PATH, isCasterMediaId } from "./application";
 import { CASTER_DIRECTORY_PATH, CASTER_PROFILE_PATH, CASTER_PUBLIC_MEDIA_PATH, isCasterPublicSlug } from "./publication";
+import { CASTER_TOURNAMENT_VIDEO_PATH } from "./tournament-video";
 
 export const CASTER_INVITATION_PATH = "/casters/invitation";
 export const CASTER_STUDIO_PATH = "/caster-studio";
@@ -69,7 +70,8 @@ export function casterRouteAccess(pathname: string, method: string, enabled: boo
   }
   if (method === "POST") {
     if (pathname === CASTER_CLAIM_PATH || pathname === CASTER_LEGAL_PATH || pathname === CASTER_SIGN_OUT_PATH ||
-      pathname === CASTER_APPLICATION_PATH || pathname === CASTER_MEDIA_PATH || pathname === CASTER_PROFILE_PATH) {
+      pathname === CASTER_APPLICATION_PATH || pathname === CASTER_MEDIA_PATH || pathname === CASTER_PROFILE_PATH ||
+      pathname === CASTER_TOURNAMENT_VIDEO_PATH) {
       return "protected-api";
     }
   }

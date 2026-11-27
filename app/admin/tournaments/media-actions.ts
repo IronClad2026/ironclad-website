@@ -55,6 +55,7 @@ export async function loadAdminTournamentMediaWorkspace(
         .from("tournament_media")
         .select(MEDIA_SELECT)
         .eq("tournament_id", tournamentId)
+        .eq("caster_managed", false)
         .order("created_at", { ascending: false })
         .order("id", { ascending: false }),
       client
@@ -432,6 +433,7 @@ async function verifyMediaScope(
     .select("id, tournament_id")
     .eq("id", mediaId)
     .eq("tournament_id", tournamentId)
+    .eq("caster_managed", false)
     .maybeSingle();
   if (error) {
     logTournamentMediaFailure("verify-media", error);
