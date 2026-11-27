@@ -13,6 +13,13 @@ const dbOrigin = "http://127.0.0.1:56977";
 const siteOrigin = "http://localhost:4312";
 const restPort = 56978;
 const publicBuildKey = "test-only-publishable-key";
+export const recoveryMediaFixture = Object.freeze({
+  tournamentId: "ca570004-0000-4000-8000-000000000001",
+  tournamentSlug: "caster-coverage-test",
+  legacyTitle: "Combined recovery legacy media control",
+  casterTitle: "Combined recovery caster managed control",
+  casterUrl: "https://www.twitch.tv/videos/83821",
+});
 const system = Object.fromEntries(Object.entries(process.env).filter(([key]) =>
   /^(?:PATH|SystemRoot|windir|PATHEXT|USERPROFILE|LOCALAPPDATA|APPDATA|TEMP|TMP|COMSPEC|SystemDrive|HOMEPATH|HOMEDRIVE|OS|NUMBER_OF_PROCESSORS|PROCESSOR_ARCHITECTURE|PROGRAMDATA|ALLUSERSPROFILE|PUBLIC|PROGRAMFILES(?:\(X86\))?|COMMONPROGRAMFILES(?:\(X86\))?|LANG|LC_ALL|PGCLIENTENCODING)$/i.test(key)));
 
@@ -22,18 +29,26 @@ function signed(role, key) {
   return `${base}.${createHmac("sha256",key).update(base).digest("base64url")}`;
 }
 
-async function reachable(label, url, child, headers) {
+function childDiagnostics(child) {
+  let tail = "";
+  const record = (value) => { tail = `${tail}${value}`.slice(-4096); };
+  child.stderr?.on("data", record);
+  child.on("error", (error) => record(error.message));
+  return () => tail.trim();
+}
+
+async function reachable(label, url, child, headers, diagnostics) {
   let lastStatus;
   const deadline = Date.now() + 65000;
   while (Date.now() < deadline) {
-    if (child.exitCode!==null) throw new Error(`Disposable ${label} exited ${child.exitCode}`);
+    if (child.exitCode!==null) throw new Error(`Disposable ${label} exited ${child.exitCode}${diagnostics?.() ? `: ${diagnostics()}` : ""}`);
     const response=await fetch(url,{headers,signal:AbortSignal.timeout(10000),redirect:"manual"}).catch(()=>null);
     if (response && response.status<500) return response;
     lastStatus=response?.status ?? lastStatus;
     await response?.body?.cancel();
     await delay(500);
   }
-  throw new Error(`Disposable ${label} did not become ready${lastStatus ? ` (last HTTP ${lastStatus})` : ""}`);
+  throw new Error(`Disposable ${label} did not become ready${lastStatus ? ` (last HTTP ${lastStatus})` : ""}${diagnostics?.() ? `: ${diagnostics()}` : ""}`);
 }
 
 async function startLocalGateway(anonymousToken) {
@@ -80,13 +95,24 @@ export async function checkRecoveryBuild({root,database,port,binary}) {
       PGRST_SERVER_HOST:"127.0.0.1",PGRST_SERVER_PORT:String(restPort),
       PGRST_DB_URI:`postgresql://postgres@127.0.0.1:${port}/${database}`,PGRST_DB_SCHEMAS:"public",
       PGRST_DB_ANON_ROLE:"anon",PGRST_DB_PRE_REQUEST:"public.require_public_gaming_profile_notice_for_api",PGRST_JWT_SECRET:key,
-    },stdio:"ignore",windowsHide:true});
-    rest.on("error",()=>{});
+    },stdio:["ignore","ignore","pipe"],windowsHide:true});
+    const restDiagnostics = childDiagnostics(rest);
     // Supabase clients use /rest/v1. Bare PostgREST mounts the same requests at /.
     gateway = await startLocalGateway(anon);
-    const sample=await reachable("PostgREST",dbOrigin+"/rest/v1/tournaments?select=title&slug=eq.caster-coverage-test",rest,{Authorization:`Bearer ${service}`});
+    const sample=await reachable("PostgREST",dbOrigin+"/rest/v1/tournaments?select=title&slug=eq.caster-coverage-test",rest,{Authorization:`Bearer ${service}`},restDiagnostics);
     assert.equal(sample.status,200);
     assert.deepEqual(await sample.json(),[{title:"Caster Coverage Test"}]);
+    const control = new URL("/rest/v1/tournament_media",dbOrigin);
+    control.searchParams.set("select","title,published,caster_managed");
+    control.searchParams.set("tournament_id",`eq.${recoveryMediaFixture.tournamentId}`);
+    control.searchParams.set("title",`in.(${recoveryMediaFixture.legacyTitle},${recoveryMediaFixture.casterTitle})`);
+    const mediaControl = await reachable("PostgREST media controls",control,rest,{Authorization:`Bearer ${service}`},restDiagnostics);
+    assert.equal(mediaControl.status,200);
+    const controls = await mediaControl.json();
+    assert.deepEqual(controls.sort((a,b)=>a.title.localeCompare(b.title)),[
+      { title: recoveryMediaFixture.casterTitle, published: false, caster_managed: true },
+      { title: recoveryMediaFixture.legacyTitle, published: true, caster_managed: false },
+    ]);
 
     // Local providers and flags only. The production opt-in probe never runs.
     site=spawn(process.execPath,[fileURLToPath(new URL("node_modules/next/dist/bin/next",root)),
@@ -97,18 +123,27 @@ export async function checkRecoveryBuild({root,database,port,binary}) {
       NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:"pk_live_"+Buffer.from("clerk.recovery-fixture.invalid$").toString("base64"),
       CLERK_SECRET_KEY:"sk_test_not-a-real-secret",TRANSACTIONAL_EMAIL_MODE:"disabled",
       CASTER_PROGRAM_ENABLED:"false",READY_PROGRAM_ENABLED:"false",PATCH2_PUBLIC_PROFILE_NOTICE_ENABLED:"true",
-    },stdio:"ignore",windowsHide:true});
-    site.on("error",()=>{});
-    const tournament=await reachable("Next.js",siteOrigin+"/tournaments",site);
+    },stdio:["ignore","ignore","pipe"],windowsHide:true});
+    const tournament=await reachable("Next.js",siteOrigin+"/tournaments",site,undefined,childDiagnostics(site));
     assert.equal(tournament.status,200);
     const publicHtml=await tournament.text();
     assert.match(publicHtml,/IronClad/i);
     assert.match(publicHtml,/Caster Coverage Test/);
+    const mediaUrl = new URL("/tournaments",siteOrigin);
+    mediaUrl.searchParams.set("tournament",recoveryMediaFixture.tournamentSlug);
+    mediaUrl.searchParams.set("tab","media");
+    const mediaPage=await fetch(mediaUrl,{redirect:"manual",signal:AbortSignal.timeout(25000)});
+    assert.equal(mediaPage.status,200);
+    const mediaHtml=await mediaPage.text();
+    assert.ok(mediaHtml.includes(recoveryMediaFixture.legacyTitle),"Feature-off build must still serve populated legacy Tournament Media");
+    assert.ok(!mediaHtml.includes(recoveryMediaFixture.casterTitle) && !mediaHtml.includes(recoveryMediaFixture.casterUrl),
+      "Feature-off build must omit managed caster media from HTML and serialized props");
     const invitation=await fetch(siteOrigin+"/casters/invitation",{redirect:"manual",signal:AbortSignal.timeout(25000)});
     assert.equal(invitation.status,404);
     const ready=await fetch(siteOrigin+"/api/ready",{method:"POST",headers:{"content-type":"application/json",Origin:siteOrigin},body:"{}",signal:AbortSignal.timeout(25000)});
     assert.equal(ready.status,404);
-    return {tournament:tournament.status,casterInvite:invitation.status,ready:ready.status,fixtureReadThroughPostgrest:true,
+    return {tournament:tournament.status,tournamentMedia:mediaPage.status,casterInvite:invitation.status,ready:ready.status,
+      fixtureReadThroughPostgrest:true,legacyMediaVisible:true,casterMediaSuppressed:true,
       environment:"loopback Next.js with disposable PostgREST and PostgreSQL"};
   } finally {
     site?.kill();

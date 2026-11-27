@@ -7,7 +7,7 @@ import { buildAtomicMigrationSql as p03Sql } from "../p03-db/package.mjs";
 import { buildAtomicMigrationSql as consolidatedSql, catalogQuery as reviewedProductionFunctions, expectedFunctions } from "../consolidated-db/package.mjs";
 import { buildPostDeploymentSql } from "../consolidated-db/post-deployment.mjs";
 import { buildProductionLegalSql } from "../consolidated-legal/publication.mjs";
-import { checkRecoveryBuild } from "./recovery-smoke.mjs";
+import { checkRecoveryBuild, recoveryMediaFixture } from "./recovery-smoke.mjs";
 
 const root = new URL("../../", import.meta.url);
 const read = (path) => readFileSync(new URL(path, root), "utf8").replaceAll("\r\n", "\n");
@@ -22,7 +22,9 @@ const before = manifest.productionBaseline.map((step) => ({ name: step.file.spli
 const postProduction = manifest.upgrade.map((step) => ({ name: step.file.split("/").at(-1),
   path: step.file, expected: step.sha256, receipt: step.stageReceipt, localForward: true }));
 assert.equal(before.length, 165);
-assert.equal(postProduction.length, 24);
+assert.equal(postProduction.length, 25);
+const mediaMigration = "20261127052305_caster_tournament_media.sql";
+assert.equal(postProduction.at(-1)?.name, mediaMigration);
 assert(postProduction.every((step) => /^supabase\/migrations\/\d{14}_[a-z0-9_]+\.sql$/.test(step.path)));
 assert(!postProduction.some((step) => /ready_ai_budget|gaming_profile_publication|match_chat_translation/.test(step.name)));
 const port = Number(process.env.P03_PG_PORT ?? "56624");
@@ -55,11 +57,41 @@ const catalogQuery = `select jsonb_build_object(
   'caster', to_regclass('ironclad_private.caster_applications') is not null)`;
 const legacyMatchStaffGrant = "select has_function_privilege('authenticated','public.send_admin_match_room_message(uuid,uuid,uuid,text)','execute')";
 const casterRecoverySnapshot = () => Promise.all([
-  "caster_phase1_invitations", "caster_applications", "caster_memberships", "caster_profiles", "caster_profile_revisions",
-  "caster_assignments", "caster_assignment_events", "caster_application_events",
-].map(async (table) => JSON.parse(await run(`select jsonb_build_object('table','${table}','rows',count(*),
+  ...[
+    "caster_phase1_invitations", "caster_applications", "caster_memberships", "caster_profiles", "caster_profile_revisions",
+    "caster_assignments", "caster_assignment_events", "caster_application_events", "caster_media_links", "caster_media_events",
+  ].map((table) => ({ table, source:`ironclad_private.${table}` })),
+  { table:"caster_managed_tournament_media", source:"(select * from public.tournament_media where caster_managed)" },
+].map(async ({ table, source }) => JSON.parse(await run(`select jsonb_build_object('table','${table}','rows',count(*),
   'digest', encode(sha256(convert_to(coalesce(jsonb_agg(to_jsonb(item) order by to_jsonb(item)::text),'[]'::jsonb)::text,'UTF8')),'hex'))
-  from ironclad_private.${table} item`))));
+  from ${source} item`))));
+const service = (body)=>run(`begin; set local role service_role; set local request.jwt.claims='{"role":"service_role"}';\n${body}\ncommit;`);
+
+async function seedLegacyVerifiedCoverage() {
+  const verifiedId = await service(`select public.caster_phase4_admin_assign('user_CasterPhase3Staff',array[
+    (select (a->>'application_id')::uuid from jsonb_array_elements(
+      public.caster_phase3_admin_list('user_CasterPhase3Staff','active','user_CasterPhase3Other',0)->'casters') a)
+  ],'ca570004-0000-4000-8000-000000000002',null,null,null,null,null,null,false,null)#>>'{assignments,0,id}';`);
+  assert.match(verifiedId,/^[0-9a-f-]{36}$/);
+  assert.equal(await service(`select public.caster_phase4_admin_save('user_CasterPhase3Staff',${literal(verifiedId)},1,null,null,null,null,'complete',
+    null,now()-interval '5 hours',null,null,null,false,null)->>'status';`),"ok");
+  return verifiedId;
+}
+
+async function addPopulatedRecoveryMedia() {
+  const { tournamentId, legacyTitle, casterTitle, casterUrl } = recoveryMediaFixture;
+  await service(`insert into public.tournament_media(tournament_id,title,url,media_type,published)
+    values(${literal(tournamentId)},${literal(legacyTitle)},'https://www.twitch.tv/videos/83820','video',true);`);
+  const casterId = await service(`select public.caster_media_save('user_CasterPhase3Other',null,null,${literal(tournamentId)},null,null,
+    ${literal(casterTitle)},${literal(casterUrl)},null,'save')#>>'{media,id}';`);
+  assert.match(casterId,/^[0-9a-f-]{36}$/);
+  assert.equal(await service(`select exists(select from jsonb_array_elements(public.caster_media_public_tournaments(array[${literal(tournamentId)}::uuid],true)) item
+    where item->>'id'=${literal(casterId)}) and not exists(select from jsonb_array_elements(public.caster_media_public_tournaments(array[${literal(tournamentId)}::uuid],false)) item
+    where item->>'id'=${literal(casterId)}) and exists(select from jsonb_array_elements(public.caster_media_public_tournaments(array[${literal(tournamentId)}::uuid],false)) item
+    where item->>'title'=${literal(legacyTitle)});`),"t","Recovery controls must diverge with the feature flag");
+  assert.equal(await service(`select caster_managed and not published from public.tournament_media where id=${literal(casterId)};`),"t");
+  await assert.rejects(service(`update public.tournament_media set published=true where id=${literal(casterId)};`),/authorized workflow/i);
+}
 
 async function verifyForwardPermissions() {
   const checks = await run(`select
@@ -71,6 +103,14 @@ async function verifyForwardPermissions() {
     not has_table_privilege('service_role','ironclad_private.ready_suggestion_rate_key','SELECT') and
     not has_function_privilege('authenticated','public.submit_ready_topic_suggestion_with_private_quota(uuid,text,text,text,text,text)','EXECUTE') and
     has_function_privilege('service_role','public.submit_ready_topic_suggestion_with_private_quota(uuid,text,text,text,text,text)','EXECUTE') and
+    to_regprocedure('public.caster_phase4_admin_save(text,uuid,integer,uuid,uuid,uuid,uuid,text,timestamptz,timestamptz,text,text,uuid,boolean,text)') is null and
+    not has_function_privilege('service_role','public.caster_phase4_admin_assign(text,uuid[],uuid,uuid,uuid,timestamptz,text,text,uuid,boolean,text)','EXECUTE') and
+    not has_function_privilege('service_role','public.caster_phase4_public_schedules(uuid[])','EXECUTE') and
+    not has_table_privilege('service_role','ironclad_private.caster_media_links','SELECT') and
+    not has_table_privilege('service_role','ironclad_private.caster_media_events','SELECT') and
+    (select count(*)=11 and bool_and(has_function_privilege('service_role',p.oid,'EXECUTE')
+      and not has_function_privilege('anon',p.oid,'EXECUTE') and not has_function_privilege('authenticated',p.oid,'EXECUTE'))
+      from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname like 'caster_media_%') and
     (select bool_and(relrowsecurity) from pg_class c join pg_namespace n on n.oid=c.relnamespace
       where n.nspname='ironclad_private' and relkind='r' and (relname like 'caster_%' or relname='ready_suggestion_rate_key'))`);
   assert.equal(checks,"t","Service-only Ready and Patch 2 permissions or Caster RLS differ");
@@ -140,7 +180,19 @@ try {
     'reg',(select count(*) from public.registrations),'outcomes',(select count(*) from public.match_participant_outcome_authority),
     'point_history',(select count(*) from public.leaderboard_point_events),'memberships',(select count(*) from public.leaderboard_tournament_season_memberships))`;
   const retention = await run(durabilityQuery);
+  let predecessorFixtureRetention;
+  let verifiedId;
   for (const m of postProduction) {
+    if (m.name === mediaMigration) {
+      out.step="legacy Caster publication and verified coverage fixture";
+      assert.equal(await run(durabilityQuery),retention,"Preceding upgrade preserved durable competition records and legal versions");
+      await run(read("tests/database/caster-phase3-publication.sql"));
+      await run(read("tests/database/caster-phase4-coverage.sql"));
+      verifiedId = await seedLegacyVerifiedCoverage();
+      assert.equal(await service("select public.close_ironclad_player_account('user_CasterPhase3Closed')->>'outcome';"),"not_found");
+      predecessorFixtureRetention = await run(durabilityQuery);
+      out.checks.push("Legacy Caster publication and coverage fixtures passed on the upgraded predecessor before scheduling retirement");
+    }
     out.step=m.name;
     const raw=sql(m);
     const receipt = m.name.slice(0,14);
@@ -154,29 +206,32 @@ try {
   const end = JSON.parse(await run(catalogQuery));
   for (const key of ["qualified_view_digest","finalize_digest","path_digest","public_standings"]) assert.equal(end[key],out.catalog[key]);
   for (const key of ["notice","staff","closure","ready"]) assert.equal(end[key],true);
-  assert.equal(await run(durabilityQuery),retention,"Release SQL preserved durable synthetic competition records and legal versions");
+  assert.ok(predecessorFixtureRetention && verifiedId,"Missing pre-transition Caster fixtures");
+  assert.equal(await run(durabilityQuery),predecessorFixtureRetention,"Final migration preserves competition records and legal versions with legacy records populated");
   out.checks.push("Upgrade preserves the two live hotfix fingerprints, the Pro path definition and legal document inventory");
-  assert.equal(await run("select count(*)::int from supabase_migrations.schema_migrations"),"189");
+  assert.equal(await run("select count(*)::int from supabase_migrations.schema_migrations"),"190");
   await verifyForwardPermissions();
   out.checks.push("RLS, service-only profile/Ready grants, suggestion rate limit, duplicate retries and denied direct client paths passed");
   assert.equal(legacyGrant,"t","Expected predecessor staff direct RPC grant");
   assert.equal(await run(legacyMatchStaffGrant),"f","Legacy staff grant must be revoked");
   assert.equal(await run("select has_function_privilege('service_role','public.call_patch2_match_staff(text,jsonb,text)','execute')"),"t");
   out.checks.push("The original live deployment crosses a changed Match Room authority contract; recovery must use the upgraded Patch 2 build with features off");
-  await run(read("tests/database/caster-phase3-publication.sql"));
-  await run(read("tests/database/caster-phase4-coverage.sql"));
-  out.checks.push("Caster publication and coverage SQL fixtures passed on the upgraded predecessor");
+  out.step="caster Tournament Media transition fixtures";
+  await run(`set fixture.caster_verified_history=${literal(verifiedId)};\n`+read("tests/database/caster-tournament-media.sql"));
+  await addPopulatedRecoveryMedia();
+  out.checks.push("Caster Tournament Media and legacy verified-history transition passed, including active public fixture and feature-off no-leak SQL control");
   await assert.rejects(run("begin; create table public.local_combined_retry_probe(checkpoint int); select 1/0; commit;"),/division by zero/i);
   assert.equal(await run("select to_regclass('public.local_combined_retry_probe') is null"),"t");
   await run("begin; create table public.local_combined_retry_probe(checkpoint int); select 1; rollback;");
   out.checks.push("A failed transaction left neither its object nor receipt. A clean retry could execute against the unchanged boundary");
+  const snapshot = await casterRecoverySnapshot();
+  assert.ok(snapshot.every((item)=>item.rows>0),"Expected durable synthetic records for recovery");
+  out.casterRecoveryDatasets = snapshot;
   if (process.env.COMBINED_RECOVERY_POSTGREST) {
     out.step = "feature-disabled recovery build over upgraded database";
-    const snapshot = await casterRecoverySnapshot();
-    assert.ok(snapshot.every((item)=>item.rows>0),"Expected durable synthetic records for recovery");
     out.appRecovery = await checkRecoveryBuild({ root, database, port, binary: process.env.COMBINED_RECOVERY_POSTGREST });
-    assert.deepEqual(await casterRecoverySnapshot(),snapshot,"Recovery must preserve invitations, applications, publications, coverage and audit records");
-    out.checks.push("The feature-disabled app served legacy public routes with upgraded Patch 2 authority and preserved all eight Caster datasets");
+    assert.deepEqual(await casterRecoverySnapshot(),snapshot,"Recovery must preserve invitations, applications, publications, coverage, Tournament Media and audit records");
+    out.checks.push("The feature-disabled app served legacy Tournament Media, suppressed caster-managed media and preserved all eleven Caster datasets");
   }
   delete out.step;
   out.ok=true;
