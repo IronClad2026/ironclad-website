@@ -1,6 +1,7 @@
 import type { Locale } from "@/lib/i18n/config";
 
 const en = {
+  formerCaster: "Former Caster",
   coverage: "Official Caster Coverage", history: "Verified IronClad Coverage", studioTitle: "Official Casting Assignments",
   upcoming: "Scheduled assignments", past: "Past assignments", empty: "You have no official casting assignments yet.",
   unavailable: "Casting assignments are temporarily unavailable.",
@@ -15,6 +16,7 @@ export type CasterCoverageCopy = typeof en;
 const copy: Record<Locale, CasterCoverageCopy> = {
   en,
   it: {
+    formerCaster: "Ex caster",
     coverage: "Copertura ufficiale dei caster", history: "Copertura IronClad verificata", studioTitle: "Incarichi ufficiali di commento",
     upcoming: "Incarichi programmati", past: "Incarichi passati", empty: "Non hai ancora incarichi ufficiali di commento.",
     unavailable: "Gli incarichi di commento sono temporaneamente non disponibili.",
@@ -24,6 +26,7 @@ const copy: Record<Locale, CasterCoverageCopy> = {
     broadcast: "Guarda la diretta", recording: "Guarda la registrazione", media: "Apri i contenuti del torneo", historicalMatch: "Incontro storico",
   },
   "zh-CN": {
+    formerCaster: "前解说员",
     coverage: "官方赛事解说", history: "经核实的 IronClad 解说记录", studioTitle: "官方解说安排",
     upcoming: "已安排的解说任务", past: "过往解说任务", empty: "你还没有官方解说任务。", unavailable: "暂时无法加载解说任务。",
     tournament: "赛事", division: "组别", match: "对局", scheduled: "已安排", completed: "已完成并核实", cancelled: "已取消", unfulfilled: "未履行",
@@ -31,6 +34,7 @@ const copy: Record<Locale, CasterCoverageCopy> = {
     broadcast: "观看直播", recording: "观看录像", media: "打开赛事媒体", historicalMatch: "历史对局",
   },
   ru: {
+    formerCaster: "Бывший комментатор",
     coverage: "Официальные трансляции", history: "Подтверждённые трансляции IronClad", studioTitle: "Официальные назначения на трансляции",
     upcoming: "Запланированные назначения", past: "Прошедшие назначения", empty: "У вас пока нет официальных назначений на трансляции.",
     unavailable: "Список назначений временно недоступен.",
@@ -40,6 +44,7 @@ const copy: Record<Locale, CasterCoverageCopy> = {
     broadcast: "Смотреть трансляцию", recording: "Смотреть запись", media: "Открыть материалы турнира", historicalMatch: "Архивный матч",
   },
   es: {
+    formerCaster: "Excomentarista",
     coverage: "Cobertura oficial de comentaristas", history: "Cobertura verificada de IronClad", studioTitle: "Asignaciones oficiales de retransmisión",
     upcoming: "Asignaciones programadas", past: "Asignaciones anteriores", empty: "Aún no tienes asignaciones oficiales de retransmisión.",
     unavailable: "Las asignaciones de retransmisión no están disponibles temporalmente.",
@@ -49,6 +54,7 @@ const copy: Record<Locale, CasterCoverageCopy> = {
     broadcast: "Ver retransmisión", recording: "Ver grabación", media: "Abrir contenido del torneo", historicalMatch: "Partida histórica",
   },
   "pt-BR": {
+    formerCaster: "Ex-caster",
     coverage: "Cobertura oficial de casters", history: "Cobertura verificada da IronClad", studioTitle: "Atribuições oficiais de transmissão",
     upcoming: "Atribuições agendadas", past: "Atribuições anteriores", empty: "Você ainda não tem atribuições oficiais de transmissão.",
     unavailable: "As atribuições de transmissão estão temporariamente indisponíveis.",
@@ -58,6 +64,7 @@ const copy: Record<Locale, CasterCoverageCopy> = {
     broadcast: "Assistir à transmissão", recording: "Assistir à gravação", media: "Abrir mídia do torneio", historicalMatch: "Partida histórica",
   },
   ko: {
+    formerCaster: "이전 캐스터",
     coverage: "공식 캐스터 중계", history: "검증된 IronClad 중계 기록", studioTitle: "공식 중계 배정",
     upcoming: "예정된 중계 배정", past: "지난 중계 배정", empty: "아직 공식 중계 배정이 없습니다.", unavailable: "현재 중계 배정을 불러올 수 없습니다.",
     tournament: "대회", division: "디비전", match: "경기", scheduled: "예정", completed: "완료 및 확인됨", cancelled: "취소됨", unfulfilled: "이행되지 않음",
@@ -65,6 +72,7 @@ const copy: Record<Locale, CasterCoverageCopy> = {
     broadcast: "중계 보기", recording: "녹화 영상 보기", media: "대회 미디어 열기", historicalMatch: "이전 경기",
   },
   fr: {
+    formerCaster: "Ancien caster",
     coverage: "Couverture officielle des casters", history: "Couverture IronClad vérifiée", studioTitle: "Missions officielles de diffusion",
     upcoming: "Missions programmées", past: "Missions passées", empty: "Vous n’avez pas encore de mission officielle de diffusion.",
     unavailable: "Les missions de diffusion sont temporairement indisponibles.",

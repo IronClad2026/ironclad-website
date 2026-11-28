@@ -112,12 +112,32 @@ describe("caster coverage projection", () => {
       row({ ...verified, caster: null }),
     ]);
     const result = await loadPublicCasterSchedules([ids.tournament, "invalid", ids.tournament]);
-    expect(rpc).toHaveBeenCalledExactlyOnceWith("caster_media_public_verified_tournaments", { p_tournament_ids: [ids.tournament] });
+    expect(rpc).toHaveBeenCalledExactlyOnceWith("caster_privacy_public_verified_tournaments", { p_tournament_ids: [ids.tournament] });
     expect(result).toHaveLength(1);
     expect(result[0]).not.toHaveProperty("application_id");
     expect(result[0]).not.toHaveProperty("conflict");
     expect(result[0]).not.toHaveProperty("reason");
     expect(result[0].caster).not.toHaveProperty("email");
+  });
+
+  it("projects a verified former credit without personal metadata, outbound links or timestamps", async () => {
+    const former = row({ former_caster: true, status: "completed",
+      covered_at: "2026-11-27T12:42:01.000Z", verified_at: "2026-11-28T03:41:00.000Z" });
+    rpc.mockResolvedValue([former, { ...former, status: "scheduled" }, { ...former, verified_at: null }]);
+    const result = await loadPublicCasterSchedules([ids.tournament]);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ former_caster: true, covered_at: "2026-11-27", verified_at: "2026-11-28",
+      scheduled_at: null, broadcast_url: null, recording_url: null, media_id: null, media_url: null, media_title: null });
+    expect(result[0]).not.toHaveProperty("caster");
+    expect(result[0]).not.toHaveProperty("application_id");
+    expect(result[0]).not.toHaveProperty("conflict");
+    await expect(loadPublicCasterHistory("caster-fixture")).resolves.toEqual([]);
+  });
+
+  it("retains the existing verified-only fallback before the retention migration", async () => {
+    rpc.mockResolvedValueOnce(null).mockResolvedValueOnce([]);
+    await expect(loadPublicCasterSchedules([ids.tournament])).resolves.toEqual([]);
+    expect(rpc).toHaveBeenLastCalledWith("caster_media_public_verified_tournaments", { p_tournament_ids: [ids.tournament] });
   });
 
   it("projects verified historical results and removes non-provider media URLs", async () => {

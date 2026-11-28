@@ -9,12 +9,12 @@
     "tail": "20261124023744"
   },
   "staging": {
-    "ref": "bda97a68f7684ea82a0b954f5cc0f7fa3de9f29a",
-    "deployment": "dpl_JE71ec6AZCdCViNcJP4YoNg4gH8V",
+    "ref": "dbf4339bf3978b3a227bb5602833055a051dc25c",
+    "deployment": "dpl_8KfDzh2b9tQdNfk5QyKSpUcYkutQ",
     "project": "zzbnneprhjicmajpjkdg",
-    "ci": "45919506477",
-    "receiptCount": 190,
-    "tail": "20261126235032"
+    "ci": "45948942827",
+    "receiptCount": 191,
+    "tail": "20261127060044"
   },
   "frozenPatch2Source": "2a62bd1328e550176b56cc490f3be0362cf03d3b",
   "productionBaseline": [
@@ -1607,10 +1607,19 @@
       "order": 25,
       "file": "supabase/migrations/20261127052305_caster_tournament_media.sql",
       "sha256": "41f1c20e308fd86e473b1a0b75e5d717172556499951ecedb1f94129f4c090fe",
+      "stageReceipt": "20261127060044",
+      "stageReceiptSha256": "41f1c20e308fd86e473b1a0b75e5d717172556499951ecedb1f94129f4c090fe",
+      "stageCompared": "exact_lf",
+      "scope": "Caster"
+    },
+    {
+      "order": 26,
+      "file": "supabase/migrations/20261127235117_caster_privacy_retention.sql",
+      "sha256": "f4640fb182d9f9f1d472155d951f0531fadf1039b97f2483cdec87fee77a06d4",
       "stageReceipt": null,
       "stageReceiptSha256": null,
       "stageCompared": "forward_candidate_only",
-      "scope": "Caster"
+      "scope": "Caster and Ready privacy"
     }
   ],
   "exclusions": [

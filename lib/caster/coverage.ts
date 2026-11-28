@@ -43,6 +43,7 @@ export type CasterCoverageAssignment = {
   application_id?: string;
   conflict?: CasterCoverageConflict;
   caster?: CasterCoverageIdentity;
+  former_caster?: true;
 };
 
 const twitchHosts = new Set(["twitch.tv", "www.twitch.tv", "m.twitch.tv"]);
@@ -95,6 +96,10 @@ function optionalDate(value: unknown): string | null {
   return typeof value === "string" && Number.isFinite(Date.parse(value)) ? value : null;
 }
 
+function publicCoverageDay(value: string | null): string | null {
+  return value ? new Date(value).toISOString().slice(0, 10) : null;
+}
+
 function parseIdentity(value: unknown): CasterCoverageIdentity | undefined {
   const caster = record(value);
   if (!caster || !isCasterPublicSlug(caster.slug) || typeof caster.display_name !== "string" ||
@@ -108,7 +113,11 @@ export function parseCasterCoverageAssignment(value: unknown): CasterCoverageAss
       typeof row.version !== "number" || !Number.isSafeInteger(row.version) || row.version < 0 || typeof row.game !== "string" ||
       !isCoverageValue(CASTER_COVERAGE_SCOPES, row.scope) || !isCoverageValue(CASTER_COVERAGE_STATUSES, row.status) ||
       typeof row.target_available !== "boolean") return null;
-  const mediaUrl = parseCasterCoverageBroadcastUrl(row.media_url);
+  const former = row.former_caster === true;
+  const coveredAt = optionalDate(row.covered_at);
+  const verifiedAt = optionalDate(row.verified_at);
+  if (former && (row.status !== "completed" || !row.target_available || !coveredAt || !verifiedAt)) return null;
+  const mediaUrl = former ? null : parseCasterCoverageBroadcastUrl(row.media_url);
   return {
     id: row.id,
     version: row.version,
@@ -123,18 +132,20 @@ export function parseCasterCoverageAssignment(value: unknown): CasterCoverageAss
     division_name: optionalText(row.division_name),
     match_id: isUuid(row.match_id) ? row.match_id : null,
     match_label: optionalText(row.match_label),
-    scheduled_at: optionalDate(row.scheduled_at),
-    covered_at: optionalDate(row.covered_at),
-    verified_at: optionalDate(row.verified_at),
-    broadcast_url: parseCasterCoverageBroadcastUrl(row.broadcast_url),
-    recording_url: parseCasterCoverageRecordingUrl(row.recording_url),
-    media_id: isUuid(row.media_id) ? row.media_id : null,
+    scheduled_at: former ? null : optionalDate(row.scheduled_at),
+    covered_at: former ? publicCoverageDay(coveredAt) : coveredAt,
+    verified_at: former ? publicCoverageDay(verifiedAt) : verifiedAt,
+    broadcast_url: former ? null : parseCasterCoverageBroadcastUrl(row.broadcast_url),
+    recording_url: former ? null : parseCasterCoverageRecordingUrl(row.recording_url),
+    media_id: !former && isUuid(row.media_id) ? row.media_id : null,
     media_url: mediaUrl,
     media_title: mediaUrl ? optionalText(row.media_title) : null,
     target_available: row.target_available,
-    application_id: isUuid(row.application_id) ? row.application_id : undefined,
-    conflict: isCasterCoverageConflict(row.conflict) ? row.conflict : undefined,
-    caster: parseIdentity(row.caster),
+    ...(former ? { former_caster: true as const } : {
+      application_id: isUuid(row.application_id) ? row.application_id : undefined,
+      conflict: isCasterCoverageConflict(row.conflict) ? row.conflict : undefined,
+      caster: parseIdentity(row.caster),
+    }),
   };
 }
 

@@ -22,9 +22,11 @@ const before = manifest.productionBaseline.map((step) => ({ name: step.file.spli
 const postProduction = manifest.upgrade.map((step) => ({ name: step.file.split("/").at(-1),
   path: step.file, expected: step.sha256, receipt: step.stageReceipt, localForward: true }));
 assert.equal(before.length, 165);
-assert.equal(postProduction.length, 25);
+assert.equal(postProduction.length, 26);
 const mediaMigration = "20261127052305_caster_tournament_media.sql";
-assert.equal(postProduction.at(-1)?.name, mediaMigration);
+const privacyMigration = "20261127235117_caster_privacy_retention.sql";
+assert.equal(postProduction.at(-2)?.name, mediaMigration);
+assert.equal(postProduction.at(-1)?.name, privacyMigration);
 assert(postProduction.every((step) => /^supabase\/migrations\/\d{14}_[a-z0-9_]+\.sql$/.test(step.path)));
 assert(!postProduction.some((step) => /ready_ai_budget|gaming_profile_publication|match_chat_translation/.test(step.name)));
 const port = Number(process.env.P03_PG_PORT ?? "56624");
@@ -221,7 +223,7 @@ try {
   assert.ok(predecessorFixtureRetention && verifiedId,"Missing pre-transition Caster fixtures");
   assert.equal(await run(durabilityQuery),predecessorFixtureRetention,"Final migration preserves competition records and legal versions with legacy records populated");
   out.checks.push("Upgrade preserves the two live hotfix fingerprints, the Pro path definition and legal document inventory");
-  assert.equal(await run("select count(*)::int from supabase_migrations.schema_migrations"),"190");
+  assert.equal(await run("select count(*)::int from supabase_migrations.schema_migrations"),String(before.length + postProduction.length));
   await verifyForwardPermissions();
   out.checks.push("RLS, service-only profile/Ready grants, suggestion rate limit, duplicate retries and denied direct client paths passed");
   assert.equal(legacyGrant,"t","Expected predecessor staff direct RPC grant");
@@ -239,6 +241,12 @@ try {
   const snapshot = await casterRecoverySnapshot();
   assert.ok(snapshot.every((item)=>item.rows>0),"Expected durable synthetic records for recovery");
   out.casterRecoveryDatasets = snapshot;
+  out.step = "deliberate privacy lifecycle and former attribution fixtures";
+  await run(read("tests/database/caster-privacy-retention.sql"));
+  await run(read("tests/database/combined-ready-retention-control.sql"));
+  assert.equal(await run("select not irreversible_enabled and not ready_scheduled_cleanup_enabled from ironclad_private.caster_privacy_control where singleton"), "t");
+  assert.deepEqual(await casterRecoverySnapshot(), snapshot, "The privacy erasure exercise must roll back entirely");
+  out.checks.push("Synthetic privacy cutoff, hold, erasure, Storage boundaries and Former Caster projection exercised; Caster disposal and Ready schedules both remained off");
   if (process.env.COMBINED_RECOVERY_POSTGREST) {
     out.step = "feature-disabled recovery build over upgraded database";
     out.appRecovery = await checkRecoveryBuild({ root, database, port, binary: process.env.COMBINED_RECOVERY_POSTGREST });

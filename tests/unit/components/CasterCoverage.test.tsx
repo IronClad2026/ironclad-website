@@ -66,6 +66,20 @@ describe("Caster coverage on public tournament surfaces", () => {
     expect(screen.queryByText("Tournament", { exact: true })).toBeNull();
     expect(screen.queryByText("Main · Final")).toBeNull();
   });
+
+  it("renders a Former Caster credit with the public event date and without user or recording links", () => {
+    const archived = match();
+    render(<MatchCasterCoverage matchId="match-1" divisionId="main" records={[{
+      ...archived, status: "completed", former_caster: true, caster: undefined, covered_at: "2026-11-27",
+      verified_at: "2026-11-28", recording_url: "https://www.youtube.com/watch?v=abcdefghijk",
+    }]} locale="en" />);
+    const disclosure = screen.getByText("Official Caster Coverage").closest("details")!;
+    disclosure.open = true;
+    expect(within(disclosure).getByText("Former Caster")).toBeVisible();
+    expect(within(disclosure).getByText("Completed and verified")).toBeVisible();
+    expect(disclosure.querySelector("time")).toHaveAttribute("datetime", "2026-11-27");
+    expect(disclosure.querySelector("img, a")).toBeNull();
+  });
 });
 
 describe("Verified caster history and private Studio", () => {

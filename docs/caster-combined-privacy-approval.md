@@ -1,5 +1,7 @@
 # Caster and Ready privacy approval package
 
+The final release review uses the [Privacy Policy 1.4 review PDF](legal-drafts/caster-ready-privacy-v1.4/ironclad-privacy-policy-v1.4.pdf), [Caster Programme notice](legal-drafts/caster-ready-privacy-v1.4/caster-programme-notice.md) and [privacy operations](caster-privacy-operations.md). This page records the earlier preparation proposal.
+
 **Review draft.** Production serves Privacy Policy 1.3 and Terms 1.1. Protected Staging still uses Privacy Policy 1.2. The proposal below uses the live Production text as its predecessor. [Effective Privacy Policy 1.3](https://www.ironcladtournaments.com/documents-rules-ppa/ironclad-privacy-policy-v1.3.pdf)
 
 ## Proposed programme notice

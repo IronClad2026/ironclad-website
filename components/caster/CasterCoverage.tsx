@@ -19,11 +19,12 @@ const linkStyle = "inline-flex min-h-11 max-w-full items-center gap-2 py-1 text-
 export function selectPublicCasterCoverage(records: readonly CasterCoverageAssignment[], { divisionId, matchId }: Context = {}) {
   const selected = new Map<string, CasterCoverageAssignment>();
   for (const record of records) {
-    if (!record.caster || !record.target_available || (record.status !== "scheduled" && record.status !== "completed")) continue;
+    if ((!record.caster && !record.former_caster) || !record.target_available || (record.status !== "scheduled" && record.status !== "completed")) continue;
     if (record.scope === "division" && (!divisionId || record.division_id !== divisionId)) continue;
     if (record.scope === "match" && (!matchId || record.match_id !== matchId || record.division_id !== divisionId)) continue;
-    const previous = selected.get(record.caster.slug);
-    if (!previous || priority[record.scope] > priority[previous.scope]) selected.set(record.caster.slug, record);
+    const key = record.caster?.slug ?? record.id;
+    const previous = selected.get(key);
+    if (!previous || priority[record.scope] > priority[previous.scope]) selected.set(key, record);
   }
   return [...selected.values()].sort((left, right) => priority[right.scope] - priority[left.scope]);
 }
@@ -43,6 +44,7 @@ function coverageLink(record: CasterCoverageAssignment, copy: CasterCoverageCopy
 }
 
 function CoverageLinks({ record, copy, mode }: { record: CasterCoverageAssignment; copy: CasterCoverageCopy; mode: Mode }) {
+  if (record.former_caster) return null;
   const tournament = mode === "schedule" ? null : coverageLink(record, copy);
   const urls = new Map<string, string>();
   if (record.status === "scheduled" || record.status === "completed") {
@@ -73,7 +75,11 @@ function CoverageLinks({ record, copy, mode }: { record: CasterCoverageAssignmen
 
 function CoverageCard({ record, locale, copy, mode }: { record: CasterCoverageAssignment; locale: Locale; copy: CasterCoverageCopy; mode: Mode }) {
   const date = record.status === "completed" ? record.covered_at : record.scheduled_at;
-  const stamp = date && Number.isFinite(Date.parse(date)) ? formatDateTime(date, locale, { kind: "utc" }) : null;
+  const stamp = date && Number.isFinite(Date.parse(date))
+    ? record.former_caster
+      ? new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "UTC" }).format(new Date(date))
+      : formatDateTime(date, locale, { kind: "utc" })
+    : null;
   const caster = record.caster;
   const verified = record.status === "completed";
   const statusTone = verified ? "border-emerald-400/25 bg-emerald-400/10 text-emerald-200" : "border-white/15 bg-white/5 text-zinc-300";
@@ -88,9 +94,11 @@ function CoverageCard({ record, locale, copy, mode }: { record: CasterCoverageAs
           {verified ? <CheckCircle2 size={13} aria-hidden="true" className="shrink-0" /> : null}{copy[record.status]}
         </span>
         <span className="text-orange-300">{scope}</span>
-        {stamp ? <time dateTime={date ?? undefined} className="text-zinc-400">{stamp} UTC</time> : null}
+        {stamp ? <time dateTime={record.former_caster ? date?.slice(0, 10) : date ?? undefined} className="text-zinc-400">{stamp}{record.former_caster ? "" : " UTC"}</time> : null}
       </div>
-      {mode === "schedule" && caster ? (
+      {record.former_caster ? (
+        <p className="mt-2 text-base font-black text-white">{copy.formerCaster}</p>
+      ) : mode === "schedule" && caster ? (
         <Link href={casterPublicProfilePath(caster.slug)} prefetch={false}
           className="mt-2 flex min-h-12 w-fit min-w-0 max-w-full items-center gap-2.5 text-left hover:text-orange-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300">
           <PublicCasterAvatar caster={caster} compact />
@@ -132,7 +140,7 @@ export function CasterCoverageList({ records, locale, mode, headingLevel = 2, un
   const Subheading = headingLevel === 2 ? "h3" : headingLevel === 3 ? "h4" : "h5";
   const display = mode === "history"
     ? records.filter((record) => record.status === "completed" && record.verified_at && record.covered_at)
-    : mode === "schedule" ? records.filter((record) => record.caster && ["scheduled", "completed"].includes(record.status)) : records;
+    : mode === "schedule" ? records.filter((record) => (record.caster || record.former_caster) && ["scheduled", "completed"].includes(record.status)) : records;
   if (!display.length && mode !== "studio") return null;
   const title = mode === "history" ? copy.history : mode === "studio" ? copy.studioTitle : copy.coverage;
   const studioGroups = mode === "studio" ? [

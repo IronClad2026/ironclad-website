@@ -23,10 +23,11 @@ export async function loadPublicCasterSchedules(tournaments: string[]): Promise<
   for (let start = 0; start < distinct.length; start += 50) {
     const ids = distinct.slice(start, start + 50);
     const allowed = new Set(ids);
-    const result = await casterRpc<unknown>("caster_media_public_verified_tournaments", { p_tournament_ids: ids })
+    const result = await casterRpc<unknown>("caster_privacy_public_verified_tournaments", { p_tournament_ids: ids })
+      ?? await casterRpc<unknown>("caster_media_public_verified_tournaments", { p_tournament_ids: ids })
       ?? await casterRpc<unknown>("caster_phase4_public_schedules", { p_tournament_ids: ids });
     rows.push(...list(result).flatMap((row) => {
-      if (!allowed.has(row.tournament_id) || !row.caster || !row.target_available ||
+      if (!allowed.has(row.tournament_id) || (!row.caster && !row.former_caster) || !row.target_available ||
           row.status !== "completed") return [];
       delete row.application_id;
       delete row.conflict;
@@ -40,7 +41,7 @@ export async function loadPublicCasterHistory(slug: string): Promise<CasterCover
   if (!isCasterProgramEnabled() || !isCasterPublicSlug(slug)) return [];
   const result = await casterRpc<unknown>("caster_phase4_public_history", { p_slug: slug });
   return list(result).flatMap((row) => {
-    if (row.status !== "completed" || !row.covered_at || !row.verified_at) return [];
+    if (row.former_caster || row.status !== "completed" || !row.covered_at || !row.verified_at) return [];
     delete row.application_id;
     delete row.conflict;
     delete row.caster;

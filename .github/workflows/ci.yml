@@ -150,7 +150,11 @@ jobs:
       - name: Check deployable source and environment boundaries
         run: node scripts/consolidated-release/cli.mjs check-source
       - name: Check exact legal publication package without publishing
-        run: node scripts/consolidated-legal/publication.mjs check
+        run: |
+          node scripts/consolidated-legal/publication.mjs check
+          node scripts/legal-successor/prepare-caster-ready-privacy-v1.4.mjs --check
+      - name: Verify deliberate Caster Storage cleanup lifecycle
+        run: node --test tests/caster-privacy/media-cleanup.mjs
       - name: Check offline release gates and fail-closed Preview and media boundaries
         run: >-
           npx vitest run
