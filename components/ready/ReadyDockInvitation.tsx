@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState, type RefObject } from "react";
-import { readyWardrobeHref, readyWardrobeOpenEvent } from "@/lib/wardrobe/catalogue";
+import { readyWardrobeHref } from "@/lib/wardrobe/catalogue";
 import styles from "./ReadyAssistant.module.css";
 
 const shownKey = "ironclad-ready:invitation:v1:shown";
@@ -108,8 +108,7 @@ export default function ReadyDockInvitation({ dock, wardrobeSessionId, onAsk }: 
       if (!preferred || !anchor || document.hidden || editingForm() || !positionAtDock(anchor)) return;
       const attempt = new AbortController();
       request = attempt;
-      const alreadyOpen = window.location.pathname === "/dashboard" &&
-        new URLSearchParams(window.location.search).get("wardrobe") === "open";
+      const alreadyOpen = window.location.pathname === readyWardrobeHref;
       const wardrobe = preferred === "wardrobe" && wardrobeSessionId && !alreadyOpen &&
         await canInviteToWardrobe(wardrobeSessionId, attempt.signal);
       if (stopped || attempt.signal.aborted || document.hidden || editingForm()) return;
@@ -189,12 +188,7 @@ export default function ReadyDockInvitation({ dock, wardrobeSessionId, onAsk }: 
       <div className={styles.dockInvitationActions}>
         {wardrobe ? (
           <Link className={styles.dockInvitationAction} href={readyWardrobeHref} prefetch={false}
-            onNavigate={(event) => {
-              close();
-              if (window.location.pathname !== "/dashboard") return;
-              event.preventDefault();
-              window.dispatchEvent(new Event(readyWardrobeOpenEvent));
-            }}>Open wardrobe</Link>
+            onNavigate={close}>Open wardrobe</Link>
         ) : <button className={styles.dockInvitationAction} onClick={onAsk} type="button">Ask Ready</button>}
         <button className={styles.dockInvitationDismiss} onClick={dismiss} type="button">Dismiss</button>
       </div>

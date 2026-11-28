@@ -63,8 +63,13 @@ it("waits for quiet time, opens Help only on request, and alternates on a new el
   render(<Dock sessionId="admin-session" />);
   await tick();
   expect(screen.getByText("Want to change my look, Commander?")).toBeVisible();
-  expect(screen.getByRole("link", { name: "Open wardrobe" })).toHaveAttribute("href",
-    "/dashboard?wardrobe=open#ready-wardrobe");
+  const wardrobeLink = screen.getByRole("link", { name: "Open wardrobe" });
+  expect(wardrobeLink).toHaveAttribute("href", "/profile/ready");
+  act(() => wardrobeLink.focus());
+  expect(wardrobeLink).toHaveFocus();
+  fireEvent.keyDown(wardrobeLink, { key: "Escape" });
+  expect(screen.queryByRole("link", { name: "Open wardrobe" })).toBeNull();
+  expect(screen.getByRole("button", { name: "Ready icon" })).toHaveFocus();
   expect(localStorage.getItem(lastKey)).toBe("wardrobe");
 });
 
