@@ -70,7 +70,6 @@ APPROVED_FILENAMES = {
         "1.1": "ironclad-privacy-policy-v1.1.pdf",
         "1.2": "ironclad-privacy-policy-v1.2.pdf",
         "1.3": "ironclad-privacy-policy-v1.3.pdf",
-        "1.4": "ironclad-privacy-policy-v1.4.pdf",
     },
 }
 
@@ -156,7 +155,7 @@ def load_corpus(
                 document,
                 review_draft=(
                     document.get("kind") == "privacy"
-                    and document.get("version") in {"1.2", "1.3", "1.4"}
+                    and document.get("version") in {"1.2", "1.3"}
                     and document.get("status") == "Review Draft"
                 ),
             )
@@ -249,13 +248,11 @@ def validate_corpus(
             review_draft
             and selected_kinds == ("privacy",)
             and kind == "privacy"
-            and version in {"1.2", "1.3", "1.4"}
+            and version in {"1.2", "1.3"}
             and document.get("status") == "Review Draft"
         )
         if document.get("status") != "Effective" and not is_approved_review_draft:
             raise ValueError(f"{kind} is not marked Effective")
-        if kind == "privacy" and version == "1.4" and not is_approved_review_draft:
-            raise ValueError("Privacy 1.4 is review-only")
         effective_date = document.get("effectiveDate")
         if not is_approved_review_draft and not isinstance(effective_date, str):
             raise ValueError(f"{kind} has no effectiveDate")
@@ -816,10 +813,6 @@ def main() -> int:
         corpus_path, args.effective_date, selected_kinds, args.review_draft
     )
     validate_corpus(corpus, args.review_draft, selected_kinds)
-    if any(document["kind"] == "privacy" and document["version"] == "1.4" for document in corpus["documents"]):
-        review_directory = ROOT / "docs" / "legal-drafts" / "caster-ready-privacy-v1.4"
-        if output_dir != review_directory or corpus_path.parent != review_directory:
-            raise ValueError("Privacy 1.4 can only be rendered in its legal review directory")
 
     print("=" * 78)
     print("IRONCLAD LEGAL DOCUMENT GENERATION")

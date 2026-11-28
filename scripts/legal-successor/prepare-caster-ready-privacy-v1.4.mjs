@@ -8,7 +8,7 @@ const root = new URL("../../", import.meta.url);
 const folder = new URL("docs/legal-drafts/caster-ready-privacy-v1.4/", root);
 const filename = "ironclad-privacy-policy-v1.4.pdf";
 const source = new URL("content/legal-corpus.json", root);
-const renderer = new URL("scripts/generate-legal-pdfs.py", root);
+const renderer = new URL("scripts/legal-successor/render-privacy-v1.4-review.py", root);
 const manifest = new URL("review-manifest.json", folder);
 const checksum = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const allowedSource = JSON.parse(readFileSync(source, "utf8"));
@@ -95,11 +95,10 @@ if (process.argv[2] === "--check") {
 } else {
   const draftPath = new URL(".privacy-1.4-render-input.json", folder);
   mkdirSync(folder, { recursive: true });
-  writeFileSync(draftPath, JSON.stringify(allowedSource, null, 2) + "\n", { flag: "wx" });
+  writeFileSync(draftPath, JSON.stringify(policy, null, 2) + "\n", { flag: "wx" });
   try {
     const python = process.argv[2] ?? (process.platform === "win32" ? "python" : "python3");
-    const render = spawnSync(python, [fileURLToPath(renderer), "--corpus", fileURLToPath(draftPath),
-      "--output-dir", fileURLToPath(folder), "--kinds", "privacy", "--review-draft"], {
+    const render = spawnSync(python, [fileURLToPath(renderer)], {
       cwd: fileURLToPath(root), stdio: "inherit",
     });
     if (render.error || render.status !== 0) throw render.error ?? new Error("Review draft generation failed.");
